@@ -1,0 +1,17 @@
+{% extends "website/base.html" %}
+
+{% block title %}Entrar — Estudante{% endblock %}
+
+{% block content %}
+<div class="panel-narrow">
+    <div class="auth-card">
+        <h1>Área do estudante</h1>
+        <p class="auth-intro">Entre com seu <strong>RA</strong> e a senha definidas no cadastro (administrador do sistema).</p>
+        <form method="post" class="form-stack" novalidate>
+            {% csrf_token %}
+            {{ form.as_p }}
+            <button type="submit" class="btn btn-primary btn-block btn-lg">Entrar</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

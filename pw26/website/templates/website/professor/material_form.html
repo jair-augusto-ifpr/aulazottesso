@@ -1,0 +1,20 @@
+{% extends "website/base.html" %}
+
+{% block title %}Novo material{% endblock %}
+
+{% block content %}
+<div class="sheet-card form-wide prose-in-card">
+    <h1>Novo documento</h1>
+    <p class="hint sheet-intro">
+        O arquivo fica arquivado e o <strong>texto para busca</strong> é o que o assistente usa para achar trechos por palavras-chave.
+    </p>
+    <form method="post" enctype="multipart/form-data" class="form-stack">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <div class="chat-actions">
+            <button type="submit" class="btn btn-primary btn-lg">Salvar material</button>
+            <a href="{% url 'professor_dashboard' %}" class="btn btn-ghost btn-lg">Cancelar</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

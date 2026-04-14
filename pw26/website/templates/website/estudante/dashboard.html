@@ -1,0 +1,37 @@
+{% extends "website/base.html" %}
+
+{% block title %}Painel — {{ student.name }}{% endblock %}
+
+{% block content %}
+<section class="prose">
+    <h1>Olá, {{ student.name }}</h1>
+    <p>Escolha seu curso e abra o assistente para perguntar sobre calendário, regulamentos e orientações.</p>
+</section>
+
+{% if not rows %}
+    <div class="card">
+        <p class="hint mb-0">Você ainda não está vinculado a nenhum curso. Peça ao responsável para associar seu cadastro no admin.</p>
+    </div>
+{% else %}
+    {% for row in rows %}
+        <section class="card course-block">
+            <h2>{{ row.course.name }}</h2>
+            {% if row.chatbots %}
+                <ul class="chatbot-list">
+                    {% for bot in row.chatbots %}
+                        <li class="chatbot-tile">
+                            <div>
+                                <span class="chatbot-tile-meta">Assistente do curso</span>
+                                <strong class="chatbot-tile-title">ChatBot #{{ bot.pk }}</strong>
+                            </div>
+                            <a class="btn btn-primary" href="{% url 'student_chat' bot.pk %}">Conversar</a>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p class="muted mb-0">Nenhum chatbot associado a este curso ainda.</p>
+            {% endif %}
+        </section>
+    {% endfor %}
+{% endif %}
+{% endblock %}

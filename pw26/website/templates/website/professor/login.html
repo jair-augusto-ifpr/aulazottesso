@@ -1,0 +1,17 @@
+{% extends "website/base.html" %}
+
+{% block title %}Entrar — Professor{% endblock %}
+
+{% block content %}
+<div class="panel-narrow">
+    <div class="auth-card">
+        <h1>Área do professor</h1>
+        <p class="auth-intro">Use seu <strong>SIAPE</strong> e a senha cadastrada para gerenciar documentos dos chatbots.</p>
+        <form method="post" class="form-stack" novalidate>
+            {% csrf_token %}
+            {{ form.as_p }}
+            <button type="submit" class="btn btn-primary btn-block btn-lg">Entrar</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

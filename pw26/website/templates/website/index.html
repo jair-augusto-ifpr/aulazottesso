@@ -1,20 +1,39 @@
-{% load static %}
+{% extends "website/base.html" %}
 
-<!DOCTYPE html>
-<html lang="pt-br">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="{% static "css/style.css" %}">
-    <title>home</title>
-</head>
-<body>
-    <h1>Home</h1>
-    
-    <ul>
-        <li><a href="{% url "home" %}">Início</a></li>
-        <li><a href="{% url "sobre" %}">Sobre</a></li>
-        <li><a href="{% url "contato" %}">Contato</a></li>
-    </ul>
-</body>
-</html>
+{% block title %}Início — IFPR Paranavaí{% endblock %}
+
+{% block content %}
+<section class="hero">
+    <span class="hero-badge">Protótipo de pesquisa · Campus Paranavaí</span>
+    <h1>Assistente virtual acadêmico-administrativo</h1>
+    <p class="lead">
+        Tire dúvidas com base em <strong>documentos institucionais</strong> do seu curso.
+        O sistema combina <strong>busca por palavras-chave</strong> nos materiais e, se configurado,
+        <strong>IA generativa</strong> para responder em linguagem natural.
+    </p>
+    <div class="hero-actions">
+        <a class="btn btn-primary btn-lg" href="{% url 'student_login' %}">Sou estudante</a>
+        <a class="btn btn-secondary btn-lg" href="{% url 'professor_login' %}">Sou professor</a>
+        <a class="btn btn-ghost btn-lg" href="{% url 'sobre' %}">Sobre o projeto</a>
+    </div>
+</section>
+
+<section class="grid-2">
+    <article class="card">
+        <h2>Como funciona</h2>
+        <ol class="steps">
+            <li><strong>Você pergunta</strong> em linguagem natural, como numa conversa.</li>
+            <li><strong>O sistema busca</strong> trechos nos documentos ligados ao chatbot do curso.</li>
+            <li><strong>Você recebe uma resposta</strong> objetiva; com API de IA, o texto é gerado a partir desses trechos.</li>
+        </ol>
+    </article>
+    <article class="card">
+        <h2>Primeiro acesso</h2>
+        <p class="card-intro">
+            No <strong>Admin</strong> do Django, cadastre cursos, vínculos, chatbots e materiais (com texto pesquisável).
+            Depois entre como <strong>estudante</strong> com RA e senha para abrir o assistente.
+        </p>
+        <p class="hint mb-0">Dica: quanto mais completo o campo <em>texto para busca</em> no material, melhores serão os resultados.</p>
+    </article>
+</section>
+{% endblock %}

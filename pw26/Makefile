@@ -1,29 +1,43 @@
-PYTHON=python
-PIP=pip
-MANAGE=$(PYTHON) manage.py
+# Python do sistema (só para criar o .venv)
+PYTHON_HOST ?= python3
 
-install:
+VENV := .venv
+PY := $(VENV)/bin/python
+PIP := $(VENV)/bin/pip
+MANAGE := $(PY) manage.py
+
+.PHONY: venv install migrate run makemigrations superuser shell collectstatic test clean
+
+# Cria o ambiente virtual local se ainda não existir
+$(PY):
+	$(PYTHON_HOST) -m venv $(VENV)
+
+install: $(PY)
 	$(PIP) install -r requirements.txt
 
-run:
+migrate: install
+	$(MANAGE) migrate --noinput
+
+# Um comando: venv + deps + migrate + servidor
+run: migrate
 	$(MANAGE) runserver
 
-migrate:
-	$(MANAGE) migrate
+venv: $(PY)
+	@echo "Ambiente em $(VENV) — rode: make run"
 
-makemigrations:
+makemigrations: install
 	$(MANAGE) makemigrations
 
-superuser:
+superuser: install
 	$(MANAGE) createsuperuser
 
-shell:
+shell: install
 	$(MANAGE) shell
 
-collectstatic:
+collectstatic: install
 	$(MANAGE) collectstatic --noinput
 
-test:
+test: install
 	$(MANAGE) test
 
 clean:

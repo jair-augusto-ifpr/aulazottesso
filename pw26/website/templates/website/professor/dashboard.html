@@ -1,0 +1,31 @@
+{% extends "website/base.html" %}
+
+{% block title %}Professor — {{ professor.name }}{% endblock %}
+
+{% block content %}
+<section class="prose">
+    <h1>{{ professor.name }}</h1>
+    <p>Envie documentos e textos para alimentar a busca dos assistentes dos seus cursos.</p>
+    <div class="page-header-actions">
+        <a class="btn btn-primary btn-lg" href="{% url 'professor_material_new' %}">+ Novo material</a>
+        <a class="btn btn-ghost" href="/admin/">Abrir admin completo</a>
+    </div>
+</section>
+
+<section class="card">
+    <h2>Seus chatbots</h2>
+    {% if chatbots %}
+        {% for b in chatbots %}
+            <div class="bot-row">
+                <div>
+                    <strong>ChatBot #{{ b.pk }}</strong>
+                    <span class="muted"> · {{ b.materials.count }} material(is)</span>
+                </div>
+                <a href="/admin/website/chatbot/{{ b.pk }}/change/">Editar</a>
+            </div>
+        {% endfor %}
+    {% else %}
+        <p class="muted mb-0">Nenhum chatbot cadastrado. Crie um no admin vinculado a este professor.</p>
+    {% endif %}
+</section>
+{% endblock %}

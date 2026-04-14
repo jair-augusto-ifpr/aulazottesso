@@ -1,11 +1,28 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
-</head>
-<body>
-    <h1>Sobre</h1>
-</body>
-</html>
+{% extends "website/base.html" %}
+
+{% block title %}Sobre o projeto{% endblock %}
+
+{% block content %}
+<article class="card prose content-narrow">
+    <h1>Projeto de pesquisa</h1>
+    <p class="lead">
+        <strong>Chatbot para atendimento acadêmico-administrativo baseado em documentos institucionais</strong>
+        — protótipo para o IFPR Campus Paranavaí.
+    </p>
+    <p>
+        Muitas dúvidas dos estudantes estão em calendários, regulamentos e normas. Fora do horário da secretaria,
+        esse acesso nem sempre é rápido. O trabalho propõe um <strong>assistente virtual</strong> que recupera trechos
+        nesses documentos e pode usar <strong>IA generativa via API</strong> para responder com clareza.
+    </p>
+    <p>
+        A pesquisa segue <strong>Design Science Research (DSR)</strong>: problema → artefato (este site) → demonstração
+        e avaliação com usuários.
+    </p>
+    <h2 class="subsection">O que este site faz</h2>
+    <p style="margin-bottom:0;">
+        Implementa o modelo de dados (cursos, pessoas, materiais, chatbots), login de estudante e professor,
+        cadastro de materiais com texto pesquisável e uma tela de conversa alinhada ao fluxo
+        <em>entrada → processamento → saída</em> da metodologia.
+    </p>
+</article>
+{% endblock %}

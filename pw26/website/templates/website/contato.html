@@ -1,11 +1,14 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Contato</title>
-</head>
-<body>
+{% extends "website/base.html" %}
+
+{% block title %}Contato{% endblock %}
+
+{% block content %}
+<section class="card prose content-medium">
     <h1>Contato</h1>
-</body>
-</html>
+    <p>Este ambiente é um <strong>protótipo acadêmico</strong>. Para informações oficiais, use os canais do IFPR.</p>
+    <ul class="list-muted">
+        <li><strong>Instituição:</strong> Instituto Federal do Paraná — Campus Paranavaí</li>
+        <li><strong>Contexto:</strong> Curso Técnico em Informática integrado ao Ensino Médio</li>
+    </ul>
+</section>
+{% endblock %}

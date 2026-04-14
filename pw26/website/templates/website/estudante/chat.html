@@ -1,0 +1,53 @@
+{% extends "website/base.html" %}
+
+{% block title %}Chat — assistente{% endblock %}
+
+{% block body_class %}page-chat{% endblock %}
+
+{% block content %}
+<div class="chat-layout">
+    <header class="chat-header">
+        <a href="{% url 'student_dashboard' %}" class="back-link">← Voltar aos cursos</a>
+        <h1>Assistente do curso</h1>
+        <p class="muted">Professor(a): {{ chatbot.professor.name }}</p>
+    </header>
+
+    <div class="chat-scroll" aria-live="polite" id="historico-chat">
+        {% if not history %}
+            <p class="hint chat-empty">Exemplos: datas do calendário, prazos, regulamento ou atividades complementares.</p>
+        {% endif %}
+        {% for turn in history %}
+            {% if turn.role == "user" %}
+                <div class="bubble bubble-user">
+                    <span class="bubble-label">Você</span>
+                    <div class="bubble-body">{{ turn.content|linebreaksbr }}</div>
+                </div>
+            {% else %}
+                <div class="bubble bubble-assistant">
+                    <span class="bubble-label">Assistente</span>
+                    <div class="bubble-body">{{ turn.content|linebreaksbr }}</div>
+                </div>
+            {% endif %}
+        {% endfor %}
+    </div>
+
+    <div class="chat-composer">
+        <form method="post" class="form-stack">
+            {% csrf_token %}
+            {{ form.as_p }}
+            <div class="chat-actions">
+                <button type="submit" class="btn btn-primary btn-lg">Enviar pergunta</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    (function () {
+        var el = document.getElementById("historico-chat");
+        if (el) el.scrollTop = el.scrollHeight;
+    })();
+</script>
+{% endblock %}

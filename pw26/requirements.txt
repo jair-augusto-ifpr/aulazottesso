@@ -1,0 +1,4 @@
+# Django 6 exige Python 3.12+; com Python mais antigo o pip instala 5.x ou 4.2 LTS.
+Django>=4.2,<7
+python-dotenv>=1.0.0
+psycopg2-binary>=2.9.9

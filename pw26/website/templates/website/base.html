@@ -1,0 +1,84 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#0a4d35">
+    <title>{% block title %}IFPR Paranavaí — Assistente acadêmico{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body class="{% block body_class %}{% endblock %}">
+    <a class="skip-link" href="#conteudo-principal">Ir para o conteúdo</a>
+
+    <header class="site-header">
+        <div class="header-inner">
+            <a href="{% url 'home' %}" class="brand">
+                <span class="brand-mark" aria-hidden="true"></span>
+                <span class="brand-text">IFPR <span class="brand-sub">Paranavaí</span></span>
+            </a>
+
+            <div class="nav-wrap">
+                <input type="checkbox" id="nav-toggle" class="nav-cb visually-hidden">
+                <label for="nav-toggle" class="nav-burger" aria-label="Abrir ou fechar menu">
+                    <span class="nav-burger-bar"></span>
+                    <span class="nav-burger-bar"></span>
+                    <span class="nav-burger-bar"></span>
+                </label>
+                <nav class="nav-main" id="navegacao-principal" aria-label="Principal">
+                    <a href="{% url 'home' %}">Início</a>
+                    <a href="{% url 'sobre' %}">Projeto</a>
+                    <a href="{% url 'contato' %}">Contato</a>
+                    <span class="nav-divider" aria-hidden="true"></span>
+                    {% if portal_student %}
+                        <a href="{% url 'student_dashboard' %}" class="nav-highlight">Meu painel</a>
+                        <a href="{% url 'student_logout' %}">Sair estudante</a>
+                    {% else %}
+                        <a href="{% url 'student_login' %}">Estudante</a>
+                    {% endif %}
+                    {% if portal_professor %}
+                        <a href="{% url 'professor_dashboard' %}" class="nav-highlight">Professor</a>
+                        <a href="{% url 'professor_logout' %}">Sair professor</a>
+                    {% else %}
+                        <a href="{% url 'professor_login' %}">Professor</a>
+                    {% endif %}
+                    <a href="/admin/" class="nav-pill">Admin</a>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    {% if messages %}
+        <div class="messages-wrap" role="region" aria-label="Mensagens">
+            <ul class="messages">
+                {% for message in messages %}
+                    <li class="msg msg-{{ message.tags }}">{{ message }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+
+    <main id="conteudo-principal" class="main-content">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="site-footer">
+        <p>Protótipo de chatbot acadêmico-administrativo — IFPR Campus Paranavaí · 2026</p>
+    </footer>
+
+    <script>
+        (function () {
+            var cb = document.getElementById("nav-toggle");
+            var nav = document.getElementById("navegacao-principal");
+            if (!cb || !nav) return;
+            nav.querySelectorAll("a").forEach(function (a) {
+                a.addEventListener("click", function () { cb.checked = false; });
+            });
+        })();
+    </script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>
