@@ -147,7 +147,13 @@ STATICFILES_DIRS = [BASE_DIR / "static"]
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
-# Opcional: respostas com IA generativa (documento de pesquisa). Sem chave, usa só trechos recuperados.
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+# Opcional: respostas com IA generativa (documento de pesquisa).
+# Sem chave, usa somente recuperação textual local.
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "qwen/qwen3-coder:free")
+
+# Google Gemini (preferido quando GEMINI_API_KEY estiver configurada).
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

@@ -27,24 +27,44 @@ class RetrievedSnippet:
     score: int
 
 
+_EXCERPT_LEN = 1500
+
+
+def _make_snippet(m: Material, score: int) -> RetrievedSnippet:
+    excerpt_source = (m.text_content or m.title or getattr(m.file, "name", "") or "").strip()
+    excerpt = excerpt_source[:_EXCERPT_LEN]
+    if len(excerpt_source) > _EXCERPT_LEN:
+        excerpt += "…"
+    return RetrievedSnippet(
+        material_id=m.pk,
+        title=m.title or getattr(m.file, "name", "") or f"Material #{m.pk}",
+        excerpt=excerpt or "(sem texto indexado — cadastre o campo texto para busca)",
+        score=score,
+    )
+
+
 def retrieve_snippets(
     chatbot: ChatBot,
     query: str,
-    limit: int = 5,
+    limit: int = 8,
     *,
     include_private: bool = False,
 ) -> list[RetrievedSnippet]:
-    """Pontua materiais ligados ao chatbot por ocorrência de termos da pergunta."""
+    """Retorna os materiais do chatbot ordenados por relevância à pergunta.
+
+    Sempre inclui os materiais vinculados (até `limit`), mesmo sem match por
+    palavra-chave, para garantir que a IA sempre receba o contexto disponível.
+    """
     terms = set(_tokenize(query))
-    if not terms:
-        terms = {query.lower().strip()} if query.strip() else set()
+    if not terms and query.strip():
+        terms = {query.lower().strip()}
 
     qs = chatbot.materials.all().distinct()
     if not include_private:
         qs = qs.filter(public=True)
     materials: Iterable[Material] = qs
-    scored: list[tuple[Material, int]] = []
 
+    scored: list[tuple[Material, int]] = []
     for m in materials:
         blob = " ".join(
             filter(
@@ -56,53 +76,88 @@ def retrieve_snippets(
                 ],
             )
         ).lower()
-        score = sum(blob.count(t) for t in terms)
+        score = sum(blob.count(t) for t in terms) if blob else 0
         if score == 0 and blob:
-            # fallback fraco: qualquer substring da pergunta inteira
             q = query.lower().strip()
             if q and q in blob:
                 score = 1
-        if score > 0:
-            scored.append((m, score))
+        scored.append((m, score))
 
-    scored.sort(key=lambda x: -x[1])
-    out: list[RetrievedSnippet] = []
-    for m, sc in scored[:limit]:
-        excerpt_source = (m.text_content or m.title or m.file.name or "").strip()
-        excerpt = excerpt_source[:800]
-        if len(excerpt_source) > 800:
-            excerpt += "…"
-        out.append(
-            RetrievedSnippet(
-                material_id=m.pk,
-                title=m.title or m.file.name or f"Material #{m.pk}",
-                excerpt=excerpt or "(sem texto indexado — cadastre o campo texto para busca)",
-                score=sc,
-            )
-        )
-    return out
+    scored.sort(key=lambda x: (-x[1], x[0].pk))
+    return [_make_snippet(m, sc) for m, sc in scored[:limit]]
 
 
-def _openai_reply(
-    user_question: str,
-    context_blocks: list[str],
-    chatbot: ChatBot,
-) -> str | None:
-    key = getattr(settings, "OPENAI_API_KEY", "") or ""
-    if not key.strip():
-        return None
-
-    context = "\n\n---\n\n".join(context_blocks) if context_blocks else "(nenhum trecho recuperado)"
-    extra = (chatbot.prompt or "").strip()
+def _build_system_prompt(chatbot: ChatBot) -> str:
     system = (
         "Você é um assistente do IFPR Campus Paranavaí. "
         "Responda em português, de forma clara e objetiva, usando apenas as informações do contexto. "
         "Se o contexto não permitir responder, diga que não encontrou nos documentos e sugira a secretaria."
     )
+    extra = (chatbot.prompt or "").strip()
     if extra:
         system = f"{system}\n\nInstruções adicionais do professor:\n{extra}"
+    return system
+
+
+def _gemini_reply(
+    user_question: str,
+    context_blocks: list[str],
+    chatbot: ChatBot,
+) -> tuple[str | None, str | None]:
+    key = (getattr(settings, "GEMINI_API_KEY", "") or "").strip()
+    model = getattr(settings, "GEMINI_MODEL", "gemini-2.5-flash") or "gemini-2.5-flash"
+    if not key:
+        return None, "GEMINI_API_KEY não configurada."
+
+    try:
+        from google import genai
+        from google.genai import types
+    except ImportError:
+        return None, "Biblioteca google-genai não instalada (pip install google-genai)."
+
+    context = "\n\n---\n\n".join(context_blocks) if context_blocks else "(nenhum trecho recuperado)"
+    system = _build_system_prompt(chatbot)
+    user_text = (
+        f"Contexto dos documentos:\n{context}\n\n"
+        f"Pergunta do estudante: {user_question}"
+    )
+
+    try:
+        client = genai.Client(api_key=key)
+        response = client.models.generate_content(
+            model=model,
+            contents=user_text,
+            config=types.GenerateContentConfig(
+                system_instruction=system,
+                temperature=0.3,
+            ),
+        )
+    except Exception as err:  # SDK lança várias classes de erro (APIError, etc.)
+        return None, f"Falha ao chamar Gemini: {err}"
+
+    text = (getattr(response, "text", None) or "").strip()
+    if not text:
+        feedback = getattr(response, "prompt_feedback", None)
+        reason = getattr(feedback, "block_reason", None) if feedback else None
+        suffix = f" ({reason})" if reason else ""
+        return None, f"Gemini retornou resposta vazia{suffix}."
+    return text, None
+
+
+def _openrouter_reply(
+    user_question: str,
+    context_blocks: list[str],
+    chatbot: ChatBot,
+) -> tuple[str | None, str | None]:
+    key = getattr(settings, "OPENROUTER_API_KEY", "") or ""
+    model = getattr(settings, "OPENROUTER_MODEL", "qwen/qwen3-coder:free") or "qwen/qwen3-coder:free"
+    if not key.strip():
+        return None, "OPENROUTER_API_KEY não configurada."
+
+    context = "\n\n---\n\n".join(context_blocks) if context_blocks else "(nenhum trecho recuperado)"
+    system = _build_system_prompt(chatbot)
     payload = {
-        "model": "gpt-4o-mini",
+        "model": model,
         "messages": [
             {"role": "system", "content": system},
             {
@@ -113,20 +168,32 @@ def _openai_reply(
         "temperature": 0.3,
     }
     req = urllib.request.Request(
-        "https://api.openai.com/v1/chat/completions",
+        "https://openrouter.ai/api/v1/chat/completions",
         data=json.dumps(payload).encode("utf-8"),
         headers={
             "Authorization": f"Bearer {key.strip()}",
             "Content-Type": "application/json",
+            "HTTP-Referer": "http://localhost:8000",
+            "X-Title": "IFPR Chatbot Academico",
         },
         method="POST",
     )
     try:
         with urllib.request.urlopen(req, timeout=60) as resp:
             data = json.loads(resp.read().decode("utf-8"))
-        return data["choices"][0]["message"]["content"].strip()
-    except (urllib.error.URLError, urllib.error.HTTPError, KeyError, TimeoutError, json.JSONDecodeError):
-        return None
+        return data["choices"][0]["message"]["content"].strip(), None
+    except urllib.error.HTTPError as err:
+        body = err.read().decode("utf-8", errors="ignore")
+        if err.code == 429:
+            return None, (
+                f"OpenRouter respondeu 429 (limite temporário para o modelo {model}). "
+                "Tente novamente em alguns segundos."
+            )
+        return None, f"OpenRouter HTTP {err.code}: {body[:220]}"
+    except urllib.error.URLError as err:
+        return None, f"Falha de rede ao chamar OpenRouter: {err.reason}"
+    except (KeyError, TimeoutError, json.JSONDecodeError):
+        return None, "Resposta inválida da API OpenRouter."
 
 
 def build_answer(
@@ -137,28 +204,44 @@ def build_answer(
 ) -> tuple[str, list[RetrievedSnippet]]:
     """
     Retorna (texto da resposta, trechos usados).
-    Com OPENAI_API_KEY, tenta gerar linguagem natural; senão, devolve trechos brutos.
+    Prioriza Gemini (GEMINI_API_KEY); se indisponível, tenta OpenRouter;
+    sem nenhuma chave, devolve os trechos recuperados localmente.
     """
     snippets = retrieve_snippets(
         chatbot, user_question, include_private=include_private
     )
     blocks = [f"[{s.title}]\n{s.excerpt}" for s in snippets]
 
-    ai = _openai_reply(user_question, blocks, chatbot)
-    if ai:
-        return ai, snippets
+    errors: list[str] = []
+
+    if (getattr(settings, "GEMINI_API_KEY", "") or "").strip():
+        ai, err = _gemini_reply(user_question, blocks, chatbot)
+        if ai:
+            return ai, snippets
+        if err:
+            errors.append(err)
+
+    if (getattr(settings, "OPENROUTER_API_KEY", "") or "").strip():
+        ai, err = _openrouter_reply(user_question, blocks, chatbot)
+        if ai:
+            return ai, snippets
+        if err:
+            errors.append(err)
+
+    api_error = " | ".join(errors) if errors else None
 
     if not snippets:
         return (
-            "Não encontrei trechos nos documentos públicos ligados a este chatbot para essa pergunta. "
-            "Peça ao professor para cadastrar materiais com o campo “texto para busca” ou reformule com outras palavras-chave.",
+            "Não há materiais vinculados a este chatbot. "
+            "Peça ao professor para cadastrar documentos e preencher o campo de texto para busca.",
             [],
         )
 
-    lines = [
-        "(Modo sem API de IA — exibindo trechos recuperados por palavras-chave.)",
-        "",
-    ]
+    lines = []
+    if api_error:
+        lines.append(f"(API indisponível agora: {api_error})")
+    lines.append("(Modo sem API de IA — exibindo trechos recuperados por palavras-chave.)")
+    lines.append("")
     for s in snippets:
         lines.append(s.title)
         lines.append(s.excerpt)
