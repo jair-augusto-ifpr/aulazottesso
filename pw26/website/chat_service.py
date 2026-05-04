@@ -10,8 +10,36 @@ from dataclasses import dataclass
 from typing import Iterable
 
 from django.conf import settings
+from django.utils import timezone
 
 from .models import ChatBot, Material
+
+
+_WEEKDAYS_PT = [
+    "segunda-feira",
+    "terça-feira",
+    "quarta-feira",
+    "quinta-feira",
+    "sexta-feira",
+    "sábado",
+    "domingo",
+]
+_MONTHS_PT = [
+    "janeiro", "fevereiro", "março", "abril", "maio", "junho",
+    "julho", "agosto", "setembro", "outubro", "novembro", "dezembro",
+]
+
+
+def _current_date_sentence() -> str:
+    now = timezone.localtime()
+    weekday = _WEEKDAYS_PT[now.weekday()]
+    month = _MONTHS_PT[now.month - 1]
+    return (
+        f"A data real de hoje é {weekday}, {now.day} de {month} de {now.year} "
+        f"(formato ISO {now.date().isoformat()}). Use SEMPRE essa data como referência "
+        "para calcular \"hoje\", \"amanhã\", \"próximo feriado\", dias que faltam, etc. "
+        "Nunca infira a data a partir do conteúdo dos documentos."
+    )
 
 
 def _tokenize(text: str) -> list[str]:
@@ -27,7 +55,7 @@ class RetrievedSnippet:
     score: int
 
 
-_EXCERPT_LEN = 1500
+_EXCERPT_LEN = 20000
 
 
 def _make_snippet(m: Material, score: int) -> RetrievedSnippet:
@@ -93,6 +121,7 @@ def _build_system_prompt(chatbot: ChatBot) -> str:
         "Responda em português, de forma clara e objetiva, usando apenas as informações do contexto. "
         "Se o contexto não permitir responder, diga que não encontrou nos documentos e sugira a secretaria."
     )
+    system = f"{system}\n\n{_current_date_sentence()}"
     extra = (chatbot.prompt or "").strip()
     if extra:
         system = f"{system}\n\nInstruções adicionais do professor:\n{extra}"

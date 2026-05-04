@@ -1,0 +1,21 @@
+{% extends "website/base.html" %}
+
+{% block title %}Cadastro — Professor{% endblock %}
+
+{% block content %}
+<div class="panel-narrow">
+    <div class="auth-card">
+        <h1>Criar conta de professor</h1>
+        <p class="auth-intro">Cadastre-se para gerenciar seus chatbots e materiais acadêmicos.</p>
+        <form method="post" class="form-stack" novalidate>
+            {% csrf_token %}
+            {{ form.as_p }}
+            <button type="submit" class="btn btn-primary btn-block btn-lg">Criar conta</button>
+        </form>
+        <p class="muted">
+            Já tem conta?
+            <a href="{% url 'professor_login' %}">Entrar</a>
+        </p>
+    </div>
+</div>
+{% endblock %}

@@ -7,8 +7,8 @@
     <h1>{{ professor.name }}</h1>
     <p>Envie documentos e textos para alimentar a busca dos assistentes dos seus cursos.</p>
     <div class="page-header-actions">
+        <a class="btn btn-secondary btn-lg" href="{% url 'professor_chatbot_new' %}">+ Novo chatbot</a>
         <a class="btn btn-primary btn-lg" href="{% url 'professor_material_new' %}">+ Novo material</a>
-        <a class="btn btn-ghost" href="/admin/">Abrir admin completo</a>
     </div>
 </section>
 
@@ -21,11 +21,14 @@
                     <strong>ChatBot #{{ b.pk }}</strong>
                     <span class="muted"> · {{ b.materials.count }} material(is)</span>
                 </div>
-                <a href="/admin/website/chatbot/{{ b.pk }}/change/">Editar</a>
+                <div class="bot-row-actions">
+                    <a href="{% url 'professor_chatbot_edit' b.pk %}">Editar</a>
+                    <a href="{% url 'professor_chatbot_delete' b.pk %}">Excluir</a>
+                </div>
             </div>
         {% endfor %}
     {% else %}
-        <p class="muted mb-0">Nenhum chatbot cadastrado. Crie um no admin vinculado a este professor.</p>
+        <p class="muted mb-0">Nenhum chatbot cadastrado. Crie o primeiro chatbot para seus cursos.</p>
     {% endif %}
 </section>
 {% endblock %}

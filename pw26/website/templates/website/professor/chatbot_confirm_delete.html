@@ -1,0 +1,16 @@
+{% extends "website/base.html" %}
+
+{% block title %}Excluir chatbot{% endblock %}
+
+{% block content %}
+<div class="sheet-card prose-in-card content-medium">
+    <h1>Excluir chatbot</h1>
+    <p>Tem certeza que deseja excluir o <strong>ChatBot #{{ chatbot.pk }}</strong>?</p>
+    <p class="muted">Esta ação remove o chatbot e seus vínculos com materiais e cursos.</p>
+    <form method="post" class="chat-actions">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-primary btn-lg">Confirmar exclusão</button>
+        <a href="{% url 'professor_dashboard' %}" class="btn btn-ghost btn-lg">Cancelar</a>
+    </form>
+</div>
+{% endblock %}

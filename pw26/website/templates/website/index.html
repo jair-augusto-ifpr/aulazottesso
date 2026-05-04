@@ -1,9 +1,20 @@
 {% extends "website/base.html" %}
+{% load static %}
 
 {% block title %}Início — IFPR Paranavaí{% endblock %}
 
 {% block content %}
 <section class="hero">
+    <p class="hero-logo-wrap">
+        <img
+            class="hero-logo"
+            src="{% static 'img/ifpr-marca-horizontal-parana.png' %}"
+            alt="Instituto Federal Paraná"
+            width="340"
+            height="80"
+            decoding="async"
+        >
+    </p>
     <span class="hero-badge">Protótipo de pesquisa · Campus Paranavaí</span>
     <h1>Assistente virtual acadêmico-administrativo</h1>
     <p class="lead">

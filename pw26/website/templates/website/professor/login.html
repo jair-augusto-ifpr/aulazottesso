@@ -12,6 +12,10 @@
             {{ form.as_p }}
             <button type="submit" class="btn btn-primary btn-block btn-lg">Entrar</button>
         </form>
+        <p class="muted">
+            Ainda não tem conta?
+            <a href="{% url 'professor_signup' %}">Criar conta</a>
+        </p>
     </div>
 </div>
 {% endblock %}

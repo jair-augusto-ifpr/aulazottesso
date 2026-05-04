@@ -18,7 +18,7 @@ class Professor(models.Model):
     name = models.CharField("nome", max_length=50)
     siape = models.CharField("SIAPE", max_length=50)
     email = models.CharField("e-mail", max_length=50)
-    password = models.CharField("senha", max_length=50)
+    password = models.CharField("senha", max_length=128)
     courses = models.ManyToManyField(
         Course,
         related_name="professors",
@@ -38,7 +38,7 @@ class Student(models.Model):
     name = models.CharField("nome", max_length=50)
     ra = models.CharField("RA", max_length=50)
     email = models.CharField("e-mail", max_length=50)
-    password = models.CharField("senha", max_length=50)
+    password = models.CharField("senha", max_length=128)
     courses = models.ManyToManyField(
         Course,
         related_name="students",

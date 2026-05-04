@@ -1,0 +1,20 @@
+{% extends "website/base.html" %}
+
+{% block title %}{% if is_edit %}Editar chatbot{% else %}Novo chatbot{% endif %}{% endblock %}
+
+{% block content %}
+<div class="sheet-card form-wide prose-in-card">
+    <h1>{% if is_edit %}Editar chatbot{% else %}Novo chatbot{% endif %}</h1>
+    <p class="hint sheet-intro">Defina o prompt e vincule cursos e materiais que o assistente poderá usar.</p>
+    <form method="post" class="form-stack">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <div class="chat-actions">
+            <button type="submit" class="btn btn-primary btn-lg">
+                {% if is_edit %}Salvar alterações{% else %}Criar chatbot{% endif %}
+            </button>
+            <a href="{% url 'professor_dashboard' %}" class="btn btn-ghost btn-lg">Cancelar</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

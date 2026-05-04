@@ -1,0 +1,21 @@
+{% extends "website/base.html" %}
+
+{% block title %}Cadastro — Estudante{% endblock %}
+
+{% block content %}
+<div class="panel-narrow">
+    <div class="auth-card">
+        <h1>Criar conta de estudante</h1>
+        <p class="auth-intro">Informe seus dados para acessar os chatbots dos seus cursos.</p>
+        <form method="post" class="form-stack" novalidate>
+            {% csrf_token %}
+            {{ form.as_p }}
+            <button type="submit" class="btn btn-primary btn-block btn-lg">Criar conta</button>
+        </form>
+        <p class="muted">
+            Já tem conta?
+            <a href="{% url 'student_login' %}">Entrar</a>
+        </p>
+    </div>
+</div>
+{% endblock %}

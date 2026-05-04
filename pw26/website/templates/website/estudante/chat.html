@@ -26,17 +26,30 @@
                 <div class="bubble bubble-assistant">
                     <span class="bubble-label">Assistente</span>
                     <div class="bubble-body">{{ turn.content|linebreaksbr }}</div>
+                    {% if turn.sources %}
+                        <details class="source-details">
+                            <summary>Fontes usadas ({{ turn.sources|length }})</summary>
+                            <div class="source-list">
+                                {% for src in turn.sources %}
+                                    <article class="source-item">
+                                        <h4>{{ src.title }}</h4>
+                                        <p>{{ src.excerpt|linebreaksbr }}</p>
+                                    </article>
+                                {% endfor %}
+                            </div>
+                        </details>
+                    {% endif %}
                 </div>
             {% endif %}
         {% endfor %}
     </div>
 
     <div class="chat-composer">
-        <form method="post" class="form-stack">
+        <form method="post" class="form-stack" id="chat-form" data-send-url="{% url 'student_chat_send' chatbot.pk %}">
             {% csrf_token %}
             {{ form.as_p }}
             <div class="chat-actions">
-                <button type="submit" class="btn btn-primary btn-lg">Enviar pergunta</button>
+                <button type="submit" class="btn btn-primary btn-lg" id="chat-submit-btn">Enviar pergunta</button>
             </div>
         </form>
     </div>
@@ -47,7 +60,105 @@
 <script>
     (function () {
         var el = document.getElementById("historico-chat");
-        if (el) el.scrollTop = el.scrollHeight;
+        var form = document.getElementById("chat-form");
+        var submitBtn = document.getElementById("chat-submit-btn");
+        if (!el || !form || !submitBtn) return;
+
+        function scrollToBottom() {
+            el.scrollTop = el.scrollHeight;
+        }
+
+        function escapeHtml(text) {
+            return text
+                .replaceAll("&", "&amp;")
+                .replaceAll("<", "&lt;")
+                .replaceAll(">", "&gt;");
+        }
+
+        function linebreaks(text) {
+            return escapeHtml(text).replaceAll("\n", "<br>");
+        }
+
+        function sourcesHtml(sources) {
+            if (!sources || !sources.length) return "";
+            var list = sources.map(function (src) {
+                return (
+                    '<article class="source-item">' +
+                    "<h4>" + escapeHtml(src.title || "Fonte") + "</h4>" +
+                    "<p>" + linebreaks(src.excerpt || "") + "</p>" +
+                    "</article>"
+                );
+            }).join("");
+            return (
+                '<details class="source-details">' +
+                "<summary>Fontes usadas (" + sources.length + ")</summary>" +
+                '<div class="source-list">' + list + "</div>" +
+                "</details>"
+            );
+        }
+
+        function appendBubble(role, content, sources) {
+            var wrapper = document.createElement("div");
+            wrapper.className = role === "user" ? "bubble bubble-user" : "bubble bubble-assistant";
+            var label = role === "user" ? "Você" : "Assistente";
+            wrapper.innerHTML =
+                '<span class="bubble-label">' + label + "</span>" +
+                '<div class="bubble-body">' + linebreaks(content) + "</div>" +
+                (role === "assistant" ? sourcesHtml(sources) : "");
+            el.appendChild(wrapper);
+            scrollToBottom();
+            return wrapper;
+        }
+
+        scrollToBottom();
+
+        form.addEventListener("submit", function (event) {
+            event.preventDefault();
+            var textarea = form.querySelector("textarea[name='message']");
+            if (!textarea) {
+                form.submit();
+                return;
+            }
+            var text = (textarea.value || "").trim();
+            if (!text) return;
+
+            submitBtn.disabled = true;
+            appendBubble("user", text);
+            textarea.value = "";
+
+            var typingBubble = document.createElement("div");
+            typingBubble.className = "bubble bubble-assistant";
+            typingBubble.innerHTML =
+                '<span class="bubble-label">Assistente</span>' +
+                '<div class="bubble-body"><span class="typing-indicator" aria-hidden="true"></span> Assistente está digitando...</div>';
+            el.appendChild(typingBubble);
+            scrollToBottom();
+
+            var csrf = form.querySelector("input[name='csrfmiddlewaretoken']");
+            fetch(form.dataset.sendUrl, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": csrf ? csrf.value : "",
+                },
+                body: JSON.stringify({ message: text }),
+            })
+                .then(function (response) {
+                    if (!response.ok) throw new Error("falha");
+                    return response.json();
+                })
+                .then(function (data) {
+                    typingBubble.remove();
+                    appendBubble("assistant", data.reply || "Sem resposta.", data.sources || []);
+                })
+                .catch(function () {
+                    typingBubble.remove();
+                    form.submit();
+                })
+                .finally(function () {
+                    submitBtn.disabled = false;
+                });
+        });
     })();
 </script>
 {% endblock %}

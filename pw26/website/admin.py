@@ -1,6 +1,17 @@
 from django.contrib import admin
 
 from .models import ChatBot, Course, Material, Professor, Student
+from .passwords import looks_hashed, set_password
+
+
+class _HashPasswordOnSaveMixin:
+    """Se o campo `password` foi preenchido com texto puro, hashea antes de salvar."""
+
+    def save_model(self, request, obj, form, change):
+        raw = getattr(obj, "password", "") or ""
+        if raw and not looks_hashed(raw):
+            set_password(obj, raw)
+        super().save_model(request, obj, form, change)
 
 
 @admin.register(Course)
@@ -10,14 +21,14 @@ class CourseAdmin(admin.ModelAdmin):
 
 
 @admin.register(Professor)
-class ProfessorAdmin(admin.ModelAdmin):
+class ProfessorAdmin(_HashPasswordOnSaveMixin, admin.ModelAdmin):
     list_display = ("name", "siape", "email")
     search_fields = ("name", "siape", "email")
     filter_horizontal = ("courses",)
 
 
 @admin.register(Student)
-class StudentAdmin(admin.ModelAdmin):
+class StudentAdmin(_HashPasswordOnSaveMixin, admin.ModelAdmin):
     list_display = ("name", "ra", "email")
     search_fields = ("name", "ra", "email")
     filter_horizontal = ("courses",)
