@@ -153,6 +153,7 @@
                 })
                 .catch(function () {
                     typingBubble.remove();
+                    textarea.value = text;
                     form.submit();
                 })
                 .finally(function () {

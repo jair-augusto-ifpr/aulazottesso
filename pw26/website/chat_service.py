@@ -80,8 +80,10 @@ def retrieve_snippets(
 ) -> list[RetrievedSnippet]:
     """Retorna os materiais do chatbot ordenados por relevância à pergunta.
 
-    Sempre inclui os materiais vinculados (até `limit`), mesmo sem match por
-    palavra-chave, para garantir que a IA sempre receba o contexto disponível.
+    Inclui materiais vinculados até `limit`, mesmo sem match por palavra-chave,
+    para garantir que a IA receba o contexto disponível. Por padrão, considera
+    apenas materiais públicos; passe `include_private=True` para incluir também
+    materiais privados vinculados ao chatbot.
     """
     terms = set(_tokenize(query))
     if not terms and query.strip():
