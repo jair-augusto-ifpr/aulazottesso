@@ -1,0 +1,155 @@
+{% extends "website/base.html" %}
+{% load static %}
+
+{% block title %}Conversa — {{ conversation.title|default:"sem título" }}{% endblock %}
+
+{% block body_class %}page-chat page-chat-gpt page-chat-readonly{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/chat-gpt.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="gpt-shell">
+    <aside class="gpt-sidebar" id="gpt-sidebar" aria-label="Conversas dos alunos">
+        <div class="gpt-sidebar-head">
+            <a href="{% url 'professor_dashboard' %}" class="gpt-brand">
+                <img class="gpt-brand-img" src="{% static 'img/ifpr-simbolo-transparente.png' %}" alt="" width="32" height="18" decoding="async">
+                <span class="gpt-brand-text">Monitoramento</span>
+            </a>
+            <a href="{% url 'professor_conversation_list' %}" class="gpt-sidebar-action gpt-sidebar-link">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                Todas as conversas
+            </a>
+            <label class="gpt-search-wrap">
+                <span class="visually-hidden">Buscar conversas</span>
+                <svg class="gpt-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+                <input type="search" id="conv-search" class="gpt-search" placeholder="Buscar conversas" autocomplete="off">
+            </label>
+        </div>
+
+        <nav class="gpt-conv-nav">
+            <p class="gpt-conv-label">Chats</p>
+            <ul class="gpt-conv-list" id="conversation-list">
+                {% for c in sidebar_conversations %}
+                    <li data-title="{{ c.title|default:'Sem título'|lower }} {{ c.student.name|lower }}">
+                        <a href="{% url 'professor_conversation_detail' c.pk %}"
+                           class="gpt-conv-item {% if c.pk == conversation.pk %}is-active{% endif %}">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/></svg>
+                            <span class="gpt-conv-title">{{ c.title|default:"Sem título" }}</span>
+                            <span class="gpt-conv-sub">{{ c.student.name }}</span>
+                        </a>
+                    </li>
+                {% endfor %}
+            </ul>
+        </nav>
+
+        <div class="gpt-sidebar-foot">
+            <div class="gpt-user-chip">
+                <span class="gpt-user-avatar" aria-hidden="true">P</span>
+                <div class="gpt-user-info">
+                    <span class="gpt-user-name">Professor</span>
+                    <span class="gpt-user-meta">Somente leitura</span>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <div class="gpt-backdrop" id="gpt-backdrop" hidden></div>
+
+    <section class="gpt-main">
+        <header class="gpt-main-head">
+            <button type="button" class="gpt-menu-btn" id="gpt-menu-btn" aria-label="Abrir menu de conversas">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+            </button>
+            <div class="gpt-main-head-info">
+                <h1 class="gpt-main-title">{{ conversation.title|default:"Conversa" }}</h1>
+                <p class="gpt-main-meta">
+                    {{ conversation.student.name }} · RA {{ conversation.student.ra }} ·
+                    {{ conversation.chatbot.assistant_title }} ·
+                    <strong>{{ tokens_total }}</strong> tokens
+                </p>
+            </div>
+        </header>
+
+        <div class="gpt-messages gpt-messages-readonly" id="historico-chat">
+            {% if not messages_list %}
+                <div class="gpt-welcome">
+                    <h2>Conversa vazia</h2>
+                    <p>O aluno ainda não enviou mensagens nesta conversa.</p>
+                </div>
+            {% else %}
+                <div class="gpt-messages-inner">
+                    {% for msg in messages_list %}
+                        {% if msg.role == "user" %}
+                            <div class="bubble bubble-user">
+                                <div class="bubble-body">{{ msg.content|linebreaksbr }}</div>
+                                <span class="bubble-meta bubble-meta-user">{{ msg.created_at|date:"d/m/Y H:i" }}</span>
+                            </div>
+                        {% else %}
+                            <div class="bubble bubble-assistant">
+                                <div class="bubble-avatar" aria-hidden="true">AI</div>
+                                <div class="bubble-content">
+                                    <div class="bubble-body">{{ msg.content|linebreaksbr }}</div>
+                                    <span class="bubble-meta">
+                                        {% if msg.model_name %}{{ msg.model_name }} · {% endif %}
+                                        {{ msg.tokens_total }} tokens · {{ msg.created_at|date:"d/m/Y H:i" }}
+                                    </span>
+                                    {% if msg.sources %}
+                                        <details class="source-details">
+                                            <summary>Fontes ({{ msg.sources|length }})</summary>
+                                            <div class="source-list">
+                                                {% for src in msg.sources %}
+                                                    <article class="source-item">
+                                                        <h4>{{ src.title }}</h4>
+                                                        <p>{{ src.excerpt|linebreaksbr }}</p>
+                                                    </article>
+                                                {% endfor %}
+                                            </div>
+                                        </details>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+            {% endif %}
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    (function () {
+        var sidebar = document.getElementById("gpt-sidebar");
+        var backdrop = document.getElementById("gpt-backdrop");
+        var menuBtn = document.getElementById("gpt-menu-btn");
+        var searchInput = document.getElementById("conv-search");
+        var list = document.getElementById("conversation-list");
+        var pane = document.getElementById("historico-chat");
+
+        function closeSidebar() {
+            if (sidebar) sidebar.classList.remove("is-open");
+            if (backdrop) backdrop.hidden = true;
+        }
+        function openSidebar() {
+            if (sidebar) sidebar.classList.add("is-open");
+            if (backdrop) backdrop.hidden = false;
+        }
+        if (menuBtn) menuBtn.addEventListener("click", openSidebar);
+        if (backdrop) backdrop.addEventListener("click", closeSidebar);
+
+        if (searchInput && list) {
+            searchInput.addEventListener("input", function () {
+                var q = (searchInput.value || "").trim().toLowerCase();
+                list.querySelectorAll("li").forEach(function (li) {
+                    var title = li.dataset.title || "";
+                    li.hidden = q && title.indexOf(q) === -1;
+                });
+            });
+        }
+        if (pane) pane.scrollTop = pane.scrollHeight;
+    })();
+</script>
+{% endblock %}

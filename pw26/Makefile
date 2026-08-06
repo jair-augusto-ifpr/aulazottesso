@@ -6,7 +6,10 @@ PY := $(VENV)/bin/python
 PIP := $(VENV)/bin/pip
 MANAGE := $(PY) manage.py
 
-.PHONY: venv install migrate run makemigrations superuser shell collectstatic test clean
+.PHONY: venv install migrate run makemigrations superuser shell collectstatic test clean deploy-gcp seed reset-db
+
+deploy-gcp:
+	./scripts/deploy-gcp.sh
 
 # Cria o ambiente virtual local se ainda não existir
 $(PY):
@@ -39,6 +42,15 @@ collectstatic: install
 
 test: install
 	$(MANAGE) test
+
+seed: install
+	$(MANAGE) seed
+
+reset-db: install
+	rm -f db.sqlite3
+	$(MANAGE) makemigrations website
+	$(MANAGE) migrate --noinput
+	$(MANAGE) seed
 
 clean:
 	find . -name "*.pyc" -delete

@@ -1,18 +1,18 @@
-"""Recuperação textual simples + resposta (API generativa opcional)."""
+"""Recuperação textual simples + resposta usando a API configurada pelo professor."""
 
 from __future__ import annotations
 
 import json
 import re
+import unicodedata
 import urllib.error
 import urllib.request
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Iterable
 
-from django.conf import settings
 from django.utils import timezone
 
-from .models import ChatBot, Material
+from .models import ChatBot, Material, ProfessorConfig
 
 
 _WEEKDAYS_PT = [
@@ -42,8 +42,15 @@ def _current_date_sentence() -> str:
     )
 
 
-def _tokenize(text: str) -> list[str]:
+def _normalize_text(text: str) -> str:
     text = text.lower()
+    return "".join(
+        ch for ch in unicodedata.normalize("NFD", text) if unicodedata.category(ch) != "Mn"
+    )
+
+
+def _tokenize(text: str) -> list[str]:
+    text = _normalize_text(text)
     return [t for t in re.split(r"[^\w]+", text) if len(t) > 2]
 
 
@@ -53,6 +60,21 @@ class RetrievedSnippet:
     title: str
     excerpt: str
     score: int
+
+
+@dataclass
+class AnswerResult:
+    """Resultado de uma resposta do assistente, incluindo uso de tokens."""
+
+    text: str
+    snippets: list = field(default_factory=list)
+    provider: str = ""
+    model: str = ""
+    tokens_prompt: int = 0
+    tokens_completion: int = 0
+    tokens_total: int = 0
+    tokens_cached: int = 0
+    error: str | None = None
 
 
 _EXCERPT_LEN = 20000
@@ -96,19 +118,21 @@ def retrieve_snippets(
 
     scored: list[tuple[Material, int]] = []
     for m in materials:
-        blob = " ".join(
-            filter(
-                None,
-                [
-                    m.title or "",
-                    m.text_content or "",
-                    getattr(m.file, "name", "") or "",
-                ],
+        blob = _normalize_text(
+            " ".join(
+                filter(
+                    None,
+                    [
+                        m.title or "",
+                        m.text_content or "",
+                        getattr(m.file, "name", "") or "",
+                    ],
+                )
             )
-        ).lower()
+        )
         score = sum(blob.count(t) for t in terms) if blob else 0
         if score == 0 and blob:
-            q = query.lower().strip()
+            q = _normalize_text(query.strip())
             if q and q in blob:
                 score = 1
         scored.append((m, score))
@@ -130,21 +154,36 @@ def _build_system_prompt(chatbot: ChatBot) -> str:
     return system
 
 
+def _gemini_usage(response) -> dict:
+    meta = getattr(response, "usage_metadata", None)
+    if not meta:
+        return {}
+    prompt = getattr(meta, "prompt_token_count", 0) or 0
+    completion = getattr(meta, "candidates_token_count", 0) or 0
+    total = getattr(meta, "total_token_count", 0) or 0
+    cached = getattr(meta, "cached_content_token_count", 0) or 0
+    if not total:
+        total = prompt + completion
+    return {"prompt": prompt, "completion": completion, "total": total, "cached": cached}
+
+
 def _gemini_reply(
     user_question: str,
     context_blocks: list[str],
     chatbot: ChatBot,
-) -> tuple[str | None, str | None]:
-    key = (getattr(settings, "GEMINI_API_KEY", "") or "").strip()
-    model = getattr(settings, "GEMINI_MODEL", "gemini-2.5-flash") or "gemini-2.5-flash"
+    api_key: str,
+    model: str,
+) -> tuple[str | None, dict | None, str | None]:
+    key = (api_key or "").strip()
+    model = (model or "").strip() or "gemini-2.5-flash"
     if not key:
-        return None, "GEMINI_API_KEY não configurada."
+        return None, None, "Chave Gemini não configurada."
 
     try:
         from google import genai
         from google.genai import types
     except ImportError:
-        return None, "Biblioteca google-genai não instalada (pip install google-genai)."
+        return None, None, "Biblioteca google-genai não instalada (pip install google-genai)."
 
     context = "\n\n---\n\n".join(context_blocks) if context_blocks else "(nenhum trecho recuperado)"
     system = _build_system_prompt(chatbot)
@@ -164,26 +203,42 @@ def _gemini_reply(
             ),
         )
     except Exception as err:  # SDK lança várias classes de erro (APIError, etc.)
-        return None, f"Falha ao chamar Gemini: {err}"
+        return None, None, f"Falha ao chamar Gemini: {err}"
 
     text = (getattr(response, "text", None) or "").strip()
     if not text:
         feedback = getattr(response, "prompt_feedback", None)
         reason = getattr(feedback, "block_reason", None) if feedback else None
         suffix = f" ({reason})" if reason else ""
-        return None, f"Gemini retornou resposta vazia{suffix}."
-    return text, None
+        return None, None, f"Gemini retornou resposta vazia{suffix}."
+    return text, _gemini_usage(response), None
+
+
+def _openrouter_usage(data: dict) -> dict:
+    usage = data.get("usage") or {}
+    prompt = usage.get("prompt_tokens", 0) or 0
+    completion = usage.get("completion_tokens", 0) or 0
+    total = usage.get("total_tokens", 0) or 0
+    cached = 0
+    details = usage.get("prompt_tokens_details") or {}
+    if isinstance(details, dict):
+        cached = details.get("cached_tokens", 0) or 0
+    if not total:
+        total = prompt + completion
+    return {"prompt": prompt, "completion": completion, "total": total, "cached": cached}
 
 
 def _openrouter_reply(
     user_question: str,
     context_blocks: list[str],
     chatbot: ChatBot,
-) -> tuple[str | None, str | None]:
-    key = getattr(settings, "OPENROUTER_API_KEY", "") or ""
-    model = getattr(settings, "OPENROUTER_MODEL", "qwen/qwen3-coder:free") or "qwen/qwen3-coder:free"
-    if not key.strip():
-        return None, "OPENROUTER_API_KEY não configurada."
+    api_key: str,
+    model: str,
+) -> tuple[str | None, dict | None, str | None]:
+    key = (api_key or "").strip()
+    model = (model or "").strip() or "qwen/qwen3-coder:free"
+    if not key:
+        return None, None, "Chave OpenRouter não configurada."
 
     context = "\n\n---\n\n".join(context_blocks) if context_blocks else "(nenhum trecho recuperado)"
     system = _build_system_prompt(chatbot)
@@ -202,7 +257,7 @@ def _openrouter_reply(
         "https://openrouter.ai/api/v1/chat/completions",
         data=json.dumps(payload).encode("utf-8"),
         headers={
-            "Authorization": f"Bearer {key.strip()}",
+            "Authorization": f"Bearer {key}",
             "Content-Type": "application/json",
             "HTTP-Referer": "http://localhost:8000",
             "X-Title": "IFPR Chatbot Academico",
@@ -212,19 +267,20 @@ def _openrouter_reply(
     try:
         with urllib.request.urlopen(req, timeout=60) as resp:
             data = json.loads(resp.read().decode("utf-8"))
-        return data["choices"][0]["message"]["content"].strip(), None
+        text = data["choices"][0]["message"]["content"].strip()
+        return text, _openrouter_usage(data), None
     except urllib.error.HTTPError as err:
         body = err.read().decode("utf-8", errors="ignore")
         if err.code == 429:
-            return None, (
+            return None, None, (
                 f"OpenRouter respondeu 429 (limite temporário para o modelo {model}). "
                 "Tente novamente em alguns segundos."
             )
-        return None, f"OpenRouter HTTP {err.code}: {body[:220]}"
+        return None, None, f"OpenRouter HTTP {err.code}: {body[:220]}"
     except urllib.error.URLError as err:
-        return None, f"Falha de rede ao chamar OpenRouter: {err.reason}"
+        return None, None, f"Falha de rede ao chamar OpenRouter: {err.reason}"
     except (KeyError, TimeoutError, json.JSONDecodeError):
-        return None, "Resposta inválida da API OpenRouter."
+        return None, None, "Resposta inválida da API OpenRouter."
 
 
 def build_answer(
@@ -232,49 +288,57 @@ def build_answer(
     user_question: str,
     *,
     include_private: bool = False,
-) -> tuple[str, list[RetrievedSnippet]]:
-    """
-    Retorna (texto da resposta, trechos usados).
-    Prioriza Gemini (GEMINI_API_KEY); se indisponível, tenta OpenRouter;
-    sem nenhuma chave, devolve os trechos recuperados localmente.
+    config: ProfessorConfig | None = None,
+) -> AnswerResult:
+    """Gera a resposta usando exclusivamente a API configurada pelo professor.
+
+    Sem `config` válida (`config.has_api()`), retorna um `AnswerResult` com `error`
+    e sem consumo de tokens — o envio deve ser bloqueado pela view.
     """
     snippets = retrieve_snippets(
         chatbot, user_question, include_private=include_private
     )
     blocks = [f"[{s.title}]\n{s.excerpt}" for s in snippets]
 
-    errors: list[str] = []
-
-    if (getattr(settings, "GEMINI_API_KEY", "") or "").strip():
-        ai, err = _gemini_reply(user_question, blocks, chatbot)
-        if ai:
-            return ai, snippets
-        if err:
-            errors.append(err)
-
-    if (getattr(settings, "OPENROUTER_API_KEY", "") or "").strip():
-        ai, err = _openrouter_reply(user_question, blocks, chatbot)
-        if ai:
-            return ai, snippets
-        if err:
-            errors.append(err)
-
-    api_error = " | ".join(errors) if errors else None
-
-    if not snippets:
-        return (
-            "Não há materiais vinculados a este chatbot. "
-            "Peça ao professor para cadastrar documentos e preencher o campo de texto para busca.",
-            [],
+    if config is None or not config.has_api():
+        return AnswerResult(
+            text="",
+            snippets=snippets,
+            error="O professor ainda não configurou uma API para este assistente.",
         )
 
-    lines = []
-    if api_error:
-        lines.append(f"(API indisponível agora: {api_error})")
-    lines.append("(Modo sem API de IA — exibindo trechos recuperados por palavras-chave.)")
-    lines.append("")
-    for s in snippets:
-        lines.append(s.title)
-        lines.append(s.excerpt)
-        lines.append("")
-    return "\n".join(lines).strip(), snippets
+    if config.provider == ProfessorConfig.PROVIDER_GEMINI:
+        text, usage, err = _gemini_reply(
+            user_question, blocks, chatbot, config.api_key, config.model
+        )
+    elif config.provider == ProfessorConfig.PROVIDER_OPENROUTER:
+        text, usage, err = _openrouter_reply(
+            user_question, blocks, chatbot, config.api_key, config.model
+        )
+    else:
+        return AnswerResult(
+            text="",
+            snippets=snippets,
+            error="Provedor de API inválido na configuração do professor.",
+        )
+
+    if err:
+        return AnswerResult(
+            text="",
+            snippets=snippets,
+            provider=config.provider,
+            model=config.model,
+            error=err,
+        )
+
+    usage = usage or {}
+    return AnswerResult(
+        text=text or "",
+        snippets=snippets,
+        provider=config.provider,
+        model=config.model,
+        tokens_prompt=usage.get("prompt", 0),
+        tokens_completion=usage.get("completion", 0),
+        tokens_total=usage.get("total", 0),
+        tokens_cached=usage.get("cached", 0),
+    )

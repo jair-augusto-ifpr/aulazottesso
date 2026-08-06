@@ -3,18 +3,28 @@
 {% block title %}Novo material{% endblock %}
 
 {% block content %}
-<div class="sheet-card form-wide prose-in-card">
-    <h1>Novo documento</h1>
-    <p class="hint sheet-intro">
-        O arquivo fica arquivado e o <strong>texto para busca</strong> é o que o assistente usa para achar trechos por palavras-chave.
-    </p>
-    <form method="post" enctype="multipart/form-data" class="form-stack">
-        {% csrf_token %}
-        {{ form.as_p }}
-        <div class="chat-actions">
-            <button type="submit" class="btn btn-primary btn-lg">Salvar material</button>
-            <a href="{% url 'professor_dashboard' %}" class="btn btn-ghost btn-lg">Cancelar</a>
+<div class="container py-4 py-lg-5">
+    <div class="row justify-content-center">
+        <div class="col-12 col-lg-8">
+            <div class="card">
+                <div class="card-body p-4">
+                    <h1 class="h3 fw-bold text-ifpr-900 mb-2">Novo documento</h1>
+                    <p class="text-muted mb-4">
+                        O arquivo fica arquivado e o <strong>texto para busca</strong> é o que o assistente usa para achar trechos por palavras-chave.
+                    </p>
+                    <form method="post" enctype="multipart/form-data" novalidate>
+                        {% csrf_token %}
+                        {% for field in form %}
+                            {% include "website/includes/form_field.html" %}
+                        {% endfor %}
+                        <div class="d-flex flex-wrap gap-2 mt-4">
+                            <button type="submit" class="btn btn-primary btn-lg">Salvar material</button>
+                            <a href="{% url 'professor_dashboard' %}" class="btn btn-outline-secondary btn-lg">Cancelar</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
         </div>
-    </form>
+    </div>
 </div>
 {% endblock %}

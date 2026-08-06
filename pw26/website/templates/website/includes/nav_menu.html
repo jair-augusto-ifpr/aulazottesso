@@ -1,0 +1,56 @@
+{% load navigation_tags %}
+<ul class="navbar-nav me-auto mb-2 mb-lg-0">
+    <li class="nav-item"><a class="nav-link" href="{% url 'home' %}">Início</a></li>
+    <li class="nav-item"><a class="nav-link" href="{% url 'sobre' %}">Projeto</a></li>
+    <li class="nav-item"><a class="nav-link" href="{% url 'contato' %}">Contato</a></li>
+</ul>
+
+<ul class="navbar-nav ms-lg-auto">
+    {% if user.is_authenticated and is_student %}
+        <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" id="navUserDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="bi bi-person-circle me-1"></i>{{ portal_student.name|default:user.get_username }}
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navUserDropdown">
+                <li><h6 class="dropdown-header">Estudante</h6></li>
+                <li><a class="dropdown-item" href="{% url 'student_dashboard' %}"><i class="bi bi-grid me-2"></i>Meu painel</a></li>
+                <li><a class="dropdown-item" href="{% url 'student_conversation_list' %}{% nav_from_panel 'student_dashboard' %}"><i class="bi bi-chat-left-text me-2"></i>Minhas conversas</a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><a class="dropdown-item" href="{% url 'password_change' %}{% nav_from_panel 'student_dashboard' %}"><i class="bi bi-key me-2"></i>Alterar senha</a></li>
+                <li><a class="dropdown-item text-danger" href="{% url 'logout' %}"><i class="bi bi-box-arrow-right me-2"></i>Sair</a></li>
+            </ul>
+        </li>
+    {% endif %}
+
+    {% if user.is_authenticated and is_professor %}
+        <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" id="navProfessorDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="bi bi-mortarboard me-1"></i>Professor
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navProfessorDropdown">
+                <li><h6 class="dropdown-header">Área do professor</h6></li>
+                <li><a class="dropdown-item" href="{% url 'professor_dashboard' %}"><i class="bi bi-grid me-2"></i>Painel</a></li>
+                <li><a class="dropdown-item" href="{% url 'professor_conversation_list' %}{% nav_from_panel 'professor_dashboard' %}"><i class="bi bi-chat-left-text me-2"></i>Conversas dos alunos</a></li>
+                <li><a class="dropdown-item" href="{% url 'professor_chatbot_list' %}{% nav_from_panel 'professor_dashboard' %}"><i class="bi bi-robot me-2"></i>Chatbots</a></li>
+                <li><a class="dropdown-item" href="{% url 'professor_material_list' %}{% nav_from_panel 'professor_dashboard' %}"><i class="bi bi-file-earmark-text me-2"></i>Materiais</a></li>
+                <li><a class="dropdown-item" href="{% url 'professor_course_list' %}{% nav_from_panel 'professor_dashboard' %}"><i class="bi bi-journal-bookmark me-2"></i>Cursos</a></li>
+                <li><a class="dropdown-item" href="{% url 'professor_config' %}{% nav_from_panel 'professor_dashboard' %}"><i class="bi bi-gear me-2"></i>API e limites</a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><a class="dropdown-item" href="{% url 'password_change' %}{% nav_from_panel 'professor_dashboard' %}"><i class="bi bi-key me-2"></i>Alterar senha</a></li>
+                <li><a class="dropdown-item text-danger" href="{% url 'logout' %}"><i class="bi bi-box-arrow-right me-2"></i>Sair</a></li>
+            </ul>
+        </li>
+    {% endif %}
+
+    {% if not user.is_authenticated %}
+        <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" id="navGuestDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="bi bi-box-arrow-in-right me-1"></i>Acesso
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navGuestDropdown">
+                <li><a class="dropdown-item" href="{% url 'student_login' %}"><i class="bi bi-person me-2"></i>Estudante</a></li>
+                <li><a class="dropdown-item" href="{% url 'professor_login' %}"><i class="bi bi-mortarboard me-2"></i>Professor</a></li>
+            </ul>
+        </li>
+    {% endif %}
+</ul>

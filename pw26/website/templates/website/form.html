@@ -1,0 +1,36 @@
+{% extends "website/base.html" %}
+
+{% block title %}{{ form_title|default:"Formulário" }}{% endblock %}
+
+{% block content %}
+<div class="container py-4 py-lg-5">
+    <div class="row justify-content-center">
+        <div class="col-12 col-md-8 col-lg-6">
+            {% include "website/includes/page_back.html" %}
+            <div class="card shadow-sm">
+                <div class="card-body p-4">
+                    <h1 class="h3 fw-bold text-ifpr-900 mb-3">{{ form_title|default:"Formulário" }}</h1>
+                    <form method="post" enctype="multipart/form-data" novalidate>
+                        {% csrf_token %}
+                        {% if nav_from %}
+                            <input type="hidden" name="from" value="{{ nav_from }}">
+                        {% endif %}
+                        {% if form.non_field_errors %}
+                            <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+                        {% endif %}
+                        {% for field in form %}
+                            {% include "website/includes/form_field.html" %}
+                        {% endfor %}
+                        <div class="d-flex flex-wrap gap-2 mt-4">
+                            <button type="submit" class="btn btn-primary">{{ submit_label|default:"Salvar" }}</button>
+                            {% if cancel_url %}
+                                <a class="btn btn-outline-secondary" href="{{ cancel_url }}">Cancelar</a>
+                            {% endif %}
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

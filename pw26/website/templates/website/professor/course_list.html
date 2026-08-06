@@ -1,0 +1,50 @@
+{% extends "website/base.html" %}
+{% load navigation_tags %}
+
+{% block title %}Cursos{% endblock %}
+
+{% block content %}
+<div class="container py-4 py-lg-5">
+    {% include "website/includes/page_back.html" %}
+    <section class="mb-3 d-flex flex-wrap align-items-center justify-content-between gap-2">
+        <h1 class="h3 fw-bold text-ifpr-900 mb-0">Cursos</h1>
+        <a class="btn btn-primary" href="{% url 'professor_course_new' %}{% nav_from_suffix %}"><i class="bi bi-plus-lg me-1"></i>Novo curso</a>
+    </section>
+
+    <section class="card">
+        <div class="card-body">
+            <div class="table-responsive table-actions-wrap">
+                <table class="table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th>Nome</th>
+                            <th>Materiais</th>
+                            <th>Chatbots</th>
+                            <th class="text-end table-actions-col">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for c in courses %}
+                        {% url 'professor_course_detail' c.pk as view_url %}
+                        {% url 'professor_course_edit' c.pk as edit_url %}
+                        {% url 'professor_course_delete' c.pk as delete_url %}
+                        {% append_nav_from view_url as view_url %}
+                        {% append_nav_from edit_url as edit_url %}
+                        {% append_nav_from delete_url as delete_url %}
+                        <tr>
+                            <td>{{ c.name }}</td>
+                            <td><span class="badge text-bg-light border">{{ c.material_count }}</span></td>
+                            <td><span class="badge text-bg-light border">{{ c.chatbot_count }}</span></td>
+                            {% include "website/includes/table_actions_dropdown.html" with row_id=c.pk view_url=view_url edit_url=edit_url delete_url=delete_url %}
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="4" class="text-muted">Nenhum curso cadastrado.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% include "website/pagination.html" %}
+        </div>
+    </section>
+</div>
+{% endblock %}

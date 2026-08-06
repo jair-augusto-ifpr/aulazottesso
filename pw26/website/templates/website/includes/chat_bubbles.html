@@ -1,0 +1,31 @@
+{% for turn in messages %}
+    {% if turn.role == "user" %}
+        <div class="bubble bubble-user">
+            <div class="bubble-body">{{ turn.content|linebreaksbr }}</div>
+        </div>
+    {% else %}
+        <div class="bubble bubble-assistant">
+            <div class="bubble-avatar" aria-hidden="true">AI</div>
+            <div class="bubble-content">
+                <div class="bubble-body">{{ turn.content|linebreaksbr }}</div>
+                <span class="bubble-meta">
+                    {% if turn.model or turn.model_name %}{{ turn.model|default:turn.model_name }} · {% endif %}
+                    {{ turn.tokens_total }} tokens
+                </span>
+                {% if turn.sources %}
+                    <details class="source-details">
+                        <summary>Fontes ({{ turn.sources|length }})</summary>
+                        <div class="source-list">
+                            {% for src in turn.sources %}
+                                <article class="source-item">
+                                    <h4>{{ src.title }}</h4>
+                                    <p>{{ src.excerpt|linebreaksbr }}</p>
+                                </article>
+                            {% endfor %}
+                        </div>
+                    </details>
+                {% endif %}
+            </div>
+        </div>
+    {% endif %}
+{% endfor %}

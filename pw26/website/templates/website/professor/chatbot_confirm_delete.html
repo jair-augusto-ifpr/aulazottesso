@@ -3,14 +3,22 @@
 {% block title %}Excluir chatbot{% endblock %}
 
 {% block content %}
-<div class="sheet-card prose-in-card content-medium">
-    <h1>Excluir chatbot</h1>
-    <p>Tem certeza que deseja excluir o <strong>ChatBot #{{ chatbot.pk }}</strong>?</p>
-    <p class="muted">Esta ação remove o chatbot e seus vínculos com materiais e cursos.</p>
-    <form method="post" class="chat-actions">
-        {% csrf_token %}
-        <button type="submit" class="btn btn-primary btn-lg">Confirmar exclusão</button>
-        <a href="{% url 'professor_dashboard' %}" class="btn btn-ghost btn-lg">Cancelar</a>
-    </form>
+<div class="container py-4 py-lg-5">
+    <div class="row justify-content-center">
+        <div class="col-12 col-md-8 col-lg-6">
+            <div class="card">
+                <div class="card-body p-4">
+                    <h1 class="h3 fw-bold text-ifpr-900 mb-3">Excluir chatbot</h1>
+                    <p>Tem certeza que deseja excluir o <strong>ChatBot #{{ chatbot.pk }}</strong>?</p>
+                    <p class="text-muted">Esta ação remove o chatbot e seus vínculos com materiais e cursos.</p>
+                    <form method="post" class="d-flex flex-wrap gap-2">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-danger btn-lg"><i class="bi bi-trash3 me-1"></i>Confirmar exclusão</button>
+                        <a href="{% url 'professor_dashboard' %}" class="btn btn-outline-secondary btn-lg">Cancelar</a>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}

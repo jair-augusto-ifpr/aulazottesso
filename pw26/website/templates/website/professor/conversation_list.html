@@ -1,0 +1,100 @@
+{% extends "website/base.html" %}
+
+{% block title %}Conversas dos meus chatbots{% endblock %}
+
+{% block content %}
+<div class="container py-4 py-lg-5">
+    {% include "website/includes/page_back.html" %}
+    <section class="mb-3">
+        <h1 class="h3 fw-bold text-ifpr-900 mb-2">Conversas</h1>
+        <p class="text-muted mb-0">Acompanhe as conversas dos alunos com os seus chatbots e o consumo de tokens.</p>
+    </section>
+
+    <section class="card mb-4">
+        <div class="card-body">
+            <h2 class="h5 fw-bold text-ifpr-900 mb-3">Uso de tokens por aluno</h2>
+            {% if student_usage %}
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead>
+                            <tr>
+                                <th>Aluno</th>
+                                <th>RA</th>
+                                <th>Respostas</th>
+                                <th>Tokens</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in student_usage %}
+                            <tr>
+                                <td>{{ row.conversation__student__name }}</td>
+                                <td>{{ row.conversation__student__ra }}</td>
+                                <td>{{ row.replies }}</td>
+                                <td><span class="badge text-bg-light border">{{ row.tokens|default:0 }}</span></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% if config and config.token_limit_per_student %}
+                    <p class="text-muted mb-0">
+                        Limite atual: {{ config.token_limit_per_student }} tokens por aluno
+                        {% if config.limit_period_days %}a cada {{ config.limit_period_days }} dias{% else %}(acumulado){% endif %}.
+                    </p>
+                {% else %}
+                    <p class="text-muted mb-0">Sem limite de tokens configurado.</p>
+                {% endif %}
+            {% else %}
+                <p class="text-muted mb-0">Ainda não há mensagens registradas.</p>
+            {% endif %}
+        </div>
+    </section>
+
+    <section class="card">
+        <div class="card-body">
+            <form method="get" class="row g-2 mb-3">
+                <div class="col-12 col-sm-8 col-md-6">
+                    <input type="search" name="q" value="{{ search_query }}" placeholder="Buscar por aluno, RA ou título…" class="form-control">
+                </div>
+                <div class="col-auto">
+                    <button type="submit" class="btn btn-secondary"><i class="bi bi-search me-1"></i>Filtrar</button>
+                </div>
+            </form>
+
+            <div class="table-responsive table-actions-wrap">
+                <table class="table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th>Conversa</th>
+                            <th>Aluno</th>
+                            <th>Chatbot</th>
+                            <th>Mensagens</th>
+                            <th>Tokens</th>
+                            <th>Atualizado</th>
+                            <th class="text-end table-actions-col">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for conv in conversations %}
+                        {% url 'professor_conversation_detail' conv.pk as view_url %}
+                        <tr>
+                            <td>{{ conv.title|default:"Sem título" }}</td>
+                            <td>{{ conv.student.name }}</td>
+                            <td>{{ conv.chatbot.assistant_title }}</td>
+                            <td>{{ conv.message_count }}</td>
+                            <td><span class="badge text-bg-light border">{{ conv.tokens|default:0 }}</span></td>
+                            <td>{{ conv.updated_at|date:"d/m/Y H:i" }}</td>
+                            {% include "website/includes/table_actions_dropdown.html" with row_id=conv.pk view_url=view_url view_label="Ver conversa" %}
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="7" class="text-muted">Nenhuma conversa encontrada.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% include "website/pagination.html" %}
+        </div>
+    </section>
+</div>
+{% endblock %}

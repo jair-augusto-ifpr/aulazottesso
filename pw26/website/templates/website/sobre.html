@@ -1,28 +1,57 @@
 {% extends "website/base.html" %}
+{% load static %}
 
 {% block title %}Sobre o projeto{% endblock %}
 
 {% block content %}
-<article class="card prose content-narrow">
-    <h1>Projeto de pesquisa</h1>
-    <p class="lead">
-        <strong>Chatbot para atendimento acadêmico-administrativo baseado em documentos institucionais</strong>
-        — protótipo para o IFPR Campus Paranavaí.
-    </p>
-    <p>
-        Muitas dúvidas dos estudantes estão em calendários, regulamentos e normas. Fora do horário da secretaria,
-        esse acesso nem sempre é rápido. O trabalho propõe um <strong>assistente virtual</strong> que recupera trechos
-        nesses documentos e pode usar <strong>IA generativa via API</strong> para responder com clareza.
-    </p>
-    <p>
-        A pesquisa segue <strong>Design Science Research (DSR)</strong>: problema → artefato (este site) → demonstração
-        e avaliação com usuários.
-    </p>
-    <h2 class="subsection">O que este site faz</h2>
-    <p style="margin-bottom:0;">
-        Implementa o modelo de dados (cursos, pessoas, materiais, chatbots), login de estudante e professor,
-        cadastro de materiais com texto pesquisável e uma tela de conversa alinhada ao fluxo
-        <em>entrada → processamento → saída</em> da metodologia.
-    </p>
-</article>
+<div class="container py-4 py-lg-5">
+    <article class="card content-narrow mx-auto">
+        <div class="card-body p-4">
+            <h1 class="h3 fw-bold text-ifpr-900 mb-3">Projeto de pesquisa</h1>
+            <p class="lead lead-ifpr">
+                <strong>Acesso inteligente à informação acadêmica:</strong> assistente institucional baseado em
+                recuperação documental e inteligência artificial — IFPR Campus Paranavaí.
+            </p>
+            <p>
+                Muitas dúvidas dos estudantes estão em calendários, regulamentos e normas. Fora do horário da secretaria,
+                esse acesso nem sempre é rápido. O trabalho propõe um <strong>assistente virtual</strong> que recupera trechos
+                nesses documentos e usa <strong>IA generativa via API</strong> (OpenRouter/Gemini) para responder com clareza,
+                sempre com base em documentos previamente selecionados.
+            </p>
+            <p>
+                A pesquisa segue <strong>Design Science Research (DSR)</strong>: problema → artefato (este site) → demonstração
+                e avaliação com usuários em ambiente controlado, com questionários em escala Likert.
+            </p>
+
+            <h2 class="h5 fw-bold text-ifpr-900 mt-4 mb-2">Diagrama de casos de uso</h2>
+            <figure class="diagram-figure">
+                <img
+                    src="{% static 'img/diagrama-casos-uso.svg' %}"
+                    alt="Diagrama de casos de uso: Aluno consulta assistente; Professor gerencia materiais e chatbots; Administrador gerencia cursos e usuários"
+                    width="720"
+                    loading="lazy"
+                >
+                <figcaption class="text-muted small mt-2">Atores e funcionalidades principais do protótipo.</figcaption>
+            </figure>
+
+            <h2 class="h5 fw-bold text-ifpr-900 mt-4 mb-2">Diagrama de classes</h2>
+            <figure class="diagram-figure">
+                <img
+                    src="{% static 'img/diagrama-classes.svg' %}"
+                    alt="Diagrama de classes: Course, Professor, Student, Material, ChatBot, Conversation e Message"
+                    width="720"
+                    loading="lazy"
+                >
+                <figcaption class="text-muted small mt-2">Modelo de dados implementado em Django.</figcaption>
+            </figure>
+
+            <h2 class="h5 fw-bold text-ifpr-900 mt-4 mb-2">O que este site faz</h2>
+            <p class="mb-0">
+                Implementa o modelo de dados (cursos, pessoas, materiais, chatbots, conversas e mensagens),
+                autenticação por grupos (Professor e Aluno), CRUD completo, chat com histórico persistido e
+                fluxo <em>entrada → processamento → saída</em> da metodologia DSR.
+            </p>
+        </div>
+    </article>
+</div>
 {% endblock %}

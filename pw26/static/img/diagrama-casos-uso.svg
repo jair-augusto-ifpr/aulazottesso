@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 420" font-family="Arial, sans-serif" font-size="13">
+  <rect width="720" height="420" fill="#f8faf9"/>
+  <text x="360" y="28" text-anchor="middle" font-size="16" font-weight="bold">Diagrama de Casos de Uso</text>
+  <rect x="300" y="60" width="120" height="300" fill="none" stroke="#0a4d35" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="360" y="82" text-anchor="middle" fill="#0a4d35" font-weight="bold">Sistema PW26</text>
+  <ellipse cx="80" cy="120" rx="55" ry="22" fill="#e8f5ef" stroke="#0a4d35"/>
+  <text x="80" y="125" text-anchor="middle">Aluno</text>
+  <ellipse cx="80" cy="220" rx="65" ry="22" fill="#e8f5ef" stroke="#0a4d35"/>
+  <text x="80" y="225" text-anchor="middle">Professor</text>
+  <ellipse cx="80" cy="320" rx="75" ry="22" fill="#e8f5ef" stroke="#0a4d35"/>
+  <text x="80" y="325" text-anchor="middle">Administrador</text>
+  <ellipse cx="360" cy="130" rx="95" ry="24" fill="#fff" stroke="#333"/>
+  <text x="360" y="135" text-anchor="middle">Consultar assistente</text>
+  <ellipse cx="360" cy="180" rx="95" ry="24" fill="#fff" stroke="#333"/>
+  <text x="360" y="185" text-anchor="middle">Ver hist�rico</text>
+  <ellipse cx="360" cy="230" rx="105" ry="24" fill="#fff" stroke="#333"/>
+  <text x="360" y="235" text-anchor="middle">Gerenciar materiais</text>
+  <ellipse cx="360" cy="280" rx="95" ry="24" fill="#fff" stroke="#333"/>
+  <text x="360" y="285" text-anchor="middle">Gerenciar chatbots</text>
+  <ellipse cx="360" cy="330" rx="95" ry="24" fill="#fff" stroke="#333"/>
+  <text x="360" y="335" text-anchor="middle">Gerenciar cursos</text>
+  <line x1="135" y1="120" x2="265" y2="130" stroke="#333"/>
+  <line x1="135" y1="120" x2="265" y2="180" stroke="#333"/>
+  <line x1="145" y1="220" x2="255" y2="230" stroke="#333"/>
+  <line x1="145" y1="220" x2="255" y2="280" stroke="#333"/>
+  <line x1="155" y1="320" x2="265" y2="330" stroke="#333"/>
+</svg>

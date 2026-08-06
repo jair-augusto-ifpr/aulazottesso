@@ -1,17 +1,15 @@
 from django.contrib import admin
 
-from .models import ChatBot, Course, Material, Professor, Student
-from .passwords import looks_hashed, set_password
-
-
-class _HashPasswordOnSaveMixin:
-    """Se o campo `password` foi preenchido com texto puro, hashea antes de salvar."""
-
-    def save_model(self, request, obj, form, change):
-        raw = getattr(obj, "password", "") or ""
-        if raw and not looks_hashed(raw):
-            set_password(obj, raw)
-        super().save_model(request, obj, form, change)
+from .models import (
+    ChatBot,
+    Conversation,
+    Course,
+    Material,
+    Message,
+    Professor,
+    ProfessorConfig,
+    Student,
+)
 
 
 @admin.register(Course)
@@ -21,30 +19,71 @@ class CourseAdmin(admin.ModelAdmin):
 
 
 @admin.register(Professor)
-class ProfessorAdmin(_HashPasswordOnSaveMixin, admin.ModelAdmin):
-    list_display = ("name", "siape", "email")
-    search_fields = ("name", "siape", "email")
+class ProfessorAdmin(admin.ModelAdmin):
+    list_display = ("name", "siape", "user")
+    search_fields = ("name", "siape", "user__username", "user__email")
     filter_horizontal = ("courses",)
+    raw_id_fields = ("user",)
+
+
+@admin.register(ProfessorConfig)
+class ProfessorConfigAdmin(admin.ModelAdmin):
+    list_display = (
+        "professor",
+        "provider",
+        "model",
+        "token_limit_per_student",
+        "limit_period_days",
+    )
+    list_filter = ("provider",)
+    search_fields = ("professor__name",)
+    raw_id_fields = ("professor",)
 
 
 @admin.register(Student)
-class StudentAdmin(_HashPasswordOnSaveMixin, admin.ModelAdmin):
-    list_display = ("name", "ra", "email")
-    search_fields = ("name", "ra", "email")
+class StudentAdmin(admin.ModelAdmin):
+    list_display = ("name", "ra", "phone", "user")
+    search_fields = ("name", "ra", "user__username", "user__email")
     filter_horizontal = ("courses",)
+    raw_id_fields = ("user",)
 
 
 @admin.register(Material)
 class MaterialAdmin(admin.ModelAdmin):
-    list_display = ("id", "title", "public", "file")
-    list_filter = ("public",)
+    list_display = ("id", "title", "owner", "public", "created_at")
+    list_filter = ("public", "owner")
     search_fields = ("title", "text_content")
     filter_horizontal = ("courses",)
+    raw_id_fields = ("owner",)
 
 
 @admin.register(ChatBot)
 class ChatBotAdmin(admin.ModelAdmin):
-    list_display = ("id", "professor", "prompt")
-    list_filter = ("professor",)
-    search_fields = ("prompt",)
+    list_display = ("id", "owner", "created_at")
+    list_filter = ("owner",)
+    search_fields = ("prompt", "owner__name")
     filter_horizontal = ("materials", "courses")
+    raw_id_fields = ("owner",)
+
+
+@admin.register(Conversation)
+class ConversationAdmin(admin.ModelAdmin):
+    list_display = ("id", "student", "chatbot", "title", "updated_at")
+    list_filter = ("chatbot",)
+    search_fields = ("title", "student__name")
+    raw_id_fields = ("student", "chatbot")
+
+
+@admin.register(Message)
+class MessageAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "conversation",
+        "role",
+        "model_name",
+        "tokens_total",
+        "created_at",
+    )
+    list_filter = ("role", "provider")
+    search_fields = ("content", "model_name")
+    raw_id_fields = ("conversation",)

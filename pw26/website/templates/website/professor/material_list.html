@@ -1,0 +1,85 @@
+{% extends "website/base.html" %}
+{% load navigation_tags %}
+
+{% block title %}Materiais{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/jquery.dataTables.min.css">
+{% endblock %}
+
+{% block content %}
+<div class="container py-4 py-lg-5">
+    {% include "website/includes/page_back.html" %}
+    <section class="mb-3 d-flex flex-wrap align-items-center justify-content-between gap-2">
+        <h1 class="h3 fw-bold text-ifpr-900 mb-0">Materiais</h1>
+        <a class="btn btn-primary" href="{% url 'professor_material_new' %}{% nav_from_suffix %}"><i class="bi bi-plus-lg me-1"></i>Novo material</a>
+    </section>
+
+    <section class="card">
+        <div class="card-body">
+            <form method="get" class="row g-2 mb-3">
+                <div class="col-12 col-sm-8 col-md-6">
+                    <input type="search" name="q" value="{{ search_query }}" placeholder="Buscar por título ou curso…" class="form-control">
+                </div>
+                <div class="col-auto">
+                    <button type="submit" class="btn btn-secondary"><i class="bi bi-search me-1"></i>Filtrar</button>
+                </div>
+            </form>
+
+            <div class="table-responsive table-actions-wrap">
+                <table id="materials-table" class="table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th>Título</th>
+                            <th>Cursos</th>
+                            <th>Público</th>
+                            <th class="text-end table-actions-col">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for m in materials %}
+                        {% url 'professor_material_detail' m.pk as view_url %}
+                        {% url 'professor_material_edit' m.pk as edit_url %}
+                        {% url 'professor_material_delete' m.pk as delete_url %}
+                        {% append_nav_from view_url as view_url %}
+                        {% append_nav_from edit_url as edit_url %}
+                        {% append_nav_from delete_url as delete_url %}
+                        <tr>
+                            <td>{{ m.title|default:m.file.name }}</td>
+                            <td>{% for c in m.courses.all %}{{ c.name }}{% if not forloop.last %}, {% endif %}{% endfor %}</td>
+                            <td>
+                                {% if m.public %}
+                                    <span class="badge text-bg-success">Sim</span>
+                                {% else %}
+                                    <span class="badge text-bg-secondary">Não</span>
+                                {% endif %}
+                            </td>
+                            {% include "website/includes/table_actions_dropdown.html" with row_id=m.pk view_url=view_url edit_url=edit_url delete_url=delete_url %}
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="4" class="text-muted">Nenhum material cadastrado.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% include "website/pagination.html" %}
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+<script>
+    $(function () {
+        $("#materials-table").DataTable({
+            paging: false,
+            searching: false,
+            info: false,
+            order: [],
+            language: { url: "https://cdn.datatables.net/plug-ins/1.13.8/i18n/pt-BR.json" }
+        });
+    });
+</script>
+{% endblock %}

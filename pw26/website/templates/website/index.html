@@ -4,47 +4,98 @@
 {% block title %}Início — IFPR Paranavaí{% endblock %}
 
 {% block content %}
-<section class="hero">
-    <p class="hero-logo-wrap">
+<div class="container py-4 py-lg-5">
+    <section class="hero mb-4 mb-lg-5">
         <img
-            class="hero-logo"
+            class="hero-logo mb-3"
             src="{% static 'img/ifpr-marca-horizontal-parana.png' %}"
             alt="Instituto Federal do Paraná"
             width="340"
             height="80"
             decoding="async"
         >
-    </p>
-    <span class="hero-badge">Protótipo de pesquisa · Campus Paranavaí</span>
-    <h1>Assistente virtual acadêmico-administrativo</h1>
-    <p class="lead">
-        Tire dúvidas com base em <strong>documentos institucionais</strong> do seu curso.
-        O sistema combina <strong>busca por palavras-chave</strong> nos materiais e, se configurado,
-        <strong>IA generativa</strong> para responder em linguagem natural.
-    </p>
-    <div class="hero-actions">
-        <a class="btn btn-primary btn-lg" href="{% url 'student_login' %}">Sou estudante</a>
-        <a class="btn btn-secondary btn-lg" href="{% url 'professor_login' %}">Sou professor</a>
-        <a class="btn btn-ghost btn-lg" href="{% url 'sobre' %}">Sobre o projeto</a>
-    </div>
-</section>
-
-<section class="grid-2">
-    <article class="card">
-        <h2>Como funciona</h2>
-        <ol class="steps">
-            <li><strong>Você pergunta</strong> em linguagem natural, como numa conversa.</li>
-            <li><strong>O sistema busca</strong> trechos nos documentos ligados ao chatbot do curso.</li>
-            <li><strong>Você recebe uma resposta</strong> objetiva; com API de IA, o texto é gerado a partir desses trechos.</li>
-        </ol>
-    </article>
-    <article class="card">
-        <h2>Primeiro acesso</h2>
-        <p class="card-intro">
-            No <strong>Admin</strong> do Django, cadastre cursos, vínculos, chatbots e materiais (com texto pesquisável).
-            Depois entre como <strong>estudante</strong> com RA e senha para abrir o assistente.
+        <span class="hero-badge">Protótipo de pesquisa · Campus Paranavaí</span>
+        <h1 class="display-6 mb-3">Assistente virtual acadêmico-administrativo</h1>
+        <p class="lead lead-ifpr">
+            Tire dúvidas com base em <strong>documentos institucionais</strong> do seu curso.
+            O sistema combina <strong>busca por palavras-chave</strong> nos materiais e, se configurado,
+            <strong>IA generativa</strong> para responder em linguagem natural.
         </p>
-        <p class="hint mb-0">Dica: quanto mais completo o campo <em>texto para busca</em> no material, melhores serão os resultados.</p>
-    </article>
-</section>
+        <div class="d-flex flex-wrap gap-2 mt-4">
+            {% if user.is_authenticated and is_student %}
+                <a class="btn btn-primary btn-lg" href="{% url 'student_dashboard' %}">Meu painel</a>
+            {% else %}
+                <a class="btn btn-primary btn-lg" href="{% url 'student_login' %}">Sou estudante</a>
+            {% endif %}
+            {% if user.is_authenticated and is_professor %}
+                <a class="btn btn-secondary btn-lg" href="{% url 'professor_dashboard' %}">Painel professor</a>
+            {% else %}
+                <a class="btn btn-secondary btn-lg" href="{% url 'professor_login' %}">Sou professor</a>
+            {% endif %}
+            <a class="btn btn-outline-secondary btn-lg" href="{% url 'sobre' %}">Sobre o projeto</a>
+        </div>
+    </section>
+
+    <section class="card mb-4">
+        <div class="card-body">
+            <h2 class="h5 fw-bold text-ifpr-900 mb-3">Indicadores do protótipo</h2>
+            <div class="row row-cols-2 row-cols-md-4 g-3">
+                <div class="col">
+                    <div class="stat-card">
+                        <div class="stat-value">{{ stats.courses }}</div>
+                        <div class="stat-label">cursos cadastrados</div>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="stat-card">
+                        <div class="stat-value">{{ stats.materials }}</div>
+                        <div class="stat-label">materiais públicos</div>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="stat-card">
+                        <div class="stat-value">{{ stats.chatbots }}</div>
+                        <div class="stat-label">assistentes ativos</div>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="stat-card">
+                        <div class="stat-value">{{ stats.conversations }}</div>
+                        <div class="stat-label">conversas registradas</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    {% if recent_chatbots %}
+    <section class="card mb-4">
+        <div class="card-body">
+            <h2 class="h5 fw-bold text-ifpr-900 mb-3">Últimos assistentes criados</h2>
+            <ul class="list-group list-group-flush">
+                {% for bot in recent_chatbots %}
+                    <li class="list-group-item px-0">
+                        <strong>{{ bot.assistant_title }}</strong>
+                        <span class="text-muted"> — professor {{ bot.owner.name }}</span>
+                        {% if bot.courses.all %}
+                            <span class="text-muted"> · {% for c in bot.courses.all %}{{ c.name }}{% if not forloop.last %}, {% endif %}{% endfor %}</span>
+                        {% endif %}
+                    </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </section>
+    {% endif %}
+
+    <section class="card">
+        <div class="card-body">
+            <h2 class="h5 fw-bold text-ifpr-900 mb-3">Como funciona</h2>
+            <ol class="steps">
+                <li><strong>Você pergunta</strong> o que precisa saber, como numa conversa.</li>
+                <li><strong>O assistente consulta</strong> calendários, regulamentos e orientações do campus.</li>
+                <li><strong>Você recebe uma resposta</strong> clara e objetiva, com base nesses documentos.</li>
+            </ol>
+        </div>
+    </section>
+</div>
 {% endblock %}

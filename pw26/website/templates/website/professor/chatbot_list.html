@@ -1,0 +1,50 @@
+{% extends "website/base.html" %}
+{% load navigation_tags %}
+
+{% block title %}Chatbots{% endblock %}
+
+{% block content %}
+<div class="container py-4 py-lg-5">
+    {% include "website/includes/page_back.html" %}
+    <section class="mb-3 d-flex flex-wrap align-items-center justify-content-between gap-2">
+        <h1 class="h3 fw-bold text-ifpr-900 mb-0">Chatbots</h1>
+        <a class="btn btn-primary" href="{% url 'professor_chatbot_new' %}{% nav_from_suffix %}"><i class="bi bi-plus-lg me-1"></i>Novo chatbot</a>
+    </section>
+
+    <section class="card">
+        <div class="card-body">
+            <div class="table-responsive table-actions-wrap">
+                <table class="table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th>Assistente</th>
+                            <th>Materiais</th>
+                            <th>Cursos</th>
+                            <th class="text-end table-actions-col">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for b in chatbots %}
+                        {% url 'professor_chatbot_detail' b.pk as view_url %}
+                        {% url 'professor_chatbot_edit' b.pk as edit_url %}
+                        {% url 'professor_chatbot_delete' b.pk as delete_url %}
+                        {% append_nav_from view_url as view_url %}
+                        {% append_nav_from edit_url as edit_url %}
+                        {% append_nav_from delete_url as delete_url %}
+                        <tr>
+                            <td>{{ b.assistant_title }}</td>
+                            <td><span class="badge text-bg-light border">{{ b.material_count }}</span></td>
+                            <td>{% for c in b.courses.all %}{{ c.name }}{% if not forloop.last %}, {% endif %}{% endfor %}</td>
+                            {% include "website/includes/table_actions_dropdown.html" with row_id=b.pk view_url=view_url edit_url=edit_url delete_url=delete_url %}
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="4" class="text-muted">Nenhum chatbot cadastrado.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% include "website/pagination.html" %}
+        </div>
+    </section>
+</div>
+{% endblock %}

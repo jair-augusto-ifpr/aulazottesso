@@ -1,0 +1,54 @@
+{% if not inline %}<td class="text-end table-actions-cell">{% endif %}
+    <div class="dropdown table-actions-dropdown{% if inline %} ms-auto flex-shrink-0{% endif %}">
+        <button type="button"
+                class="btn btn-sm btn-light border-0 table-actions-toggle"
+                id="actions-row-{% if row_id %}{{ row_id }}{% else %}menu{% endif %}"
+                data-bs-toggle="dropdown"
+                data-bs-boundary="viewport"
+                data-bs-reference="toggle"
+                data-bs-popper-config='{"strategy":"fixed","placement":"bottom-end","modifiers":[{"name":"preventOverflow","options":{"boundary":"viewport","padding":8}},{"name":"flip","options":{"fallbackPlacements":["top-end","bottom-start","top-start"]}}]}'
+                aria-expanded="false"
+                aria-label="Abrir menu de ações">
+            <i class="bi bi-three-dots-vertical" aria-hidden="true"></i>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end shadow-sm" aria-labelledby="actions-row-{% if row_id %}{{ row_id }}{% else %}menu{% endif %}">
+            {% if open_url %}
+                <li>
+                    <a class="dropdown-item" href="{{ open_url }}">
+                        <i class="bi bi-box-arrow-up-right me-2" aria-hidden="true"></i>{{ open_label|default:"Abrir" }}
+                    </a>
+                </li>
+            {% elif open_chatbot_id and open_conversation_id %}
+                <li>
+                    <a class="dropdown-item" href="{% url 'student_chat' open_chatbot_id %}?conversa={{ open_conversation_id }}">
+                        <i class="bi bi-box-arrow-up-right me-2" aria-hidden="true"></i>{{ open_label|default:"Abrir" }}
+                    </a>
+                </li>
+            {% endif %}
+            {% if view_url %}
+                <li>
+                    <a class="dropdown-item" href="{{ view_url }}">
+                        <i class="bi bi-eye me-2" aria-hidden="true"></i>{{ view_label|default:"Ver" }}
+                    </a>
+                </li>
+            {% endif %}
+            {% if edit_url %}
+                <li>
+                    <a class="dropdown-item" href="{{ edit_url }}">
+                        <i class="bi bi-pencil me-2" aria-hidden="true"></i>{{ edit_label|default:"Editar" }}
+                    </a>
+                </li>
+            {% endif %}
+            {% if delete_url %}
+                {% if open_url or open_chatbot_id and open_conversation_id or view_url or edit_url %}
+                    <li><hr class="dropdown-divider"></li>
+                {% endif %}
+                <li>
+                    <a class="dropdown-item text-danger" href="{{ delete_url }}">
+                        <i class="bi bi-trash3 me-2" aria-hidden="true"></i>{{ delete_label|default:"Excluir" }}
+                    </a>
+                </li>
+            {% endif %}
+        </ul>
+    </div>
+{% if not inline %}</td>{% endif %}

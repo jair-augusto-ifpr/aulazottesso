@@ -1,0 +1,32 @@
+{% extends "website/base.html" %}
+
+{% block title %}{{ course.name }}{% endblock %}
+
+{% block content %}
+<div class="container py-4 py-lg-5">
+    {% include "website/includes/page_back.html" %}
+    <article class="card">
+        <div class="card-body">
+            <h1 class="h3 fw-bold text-ifpr-900 mb-4">{{ course.name }}</h1>
+
+            <h2 class="h6 text-uppercase text-muted mb-2">Materiais recentes</h2>
+            <ul class="list-group list-group-flush mb-4">
+                {% for m in materials %}
+                    <li class="list-group-item px-0">{{ m.title|default:m.file.name }}</li>
+                {% empty %}
+                    <li class="list-group-item px-0 text-muted">Nenhum material neste curso.</li>
+                {% endfor %}
+            </ul>
+
+            <h2 class="h6 text-uppercase text-muted mb-2">Chatbots</h2>
+            <ul class="list-group list-group-flush mb-4">
+                {% for b in chatbots %}
+                    <li class="list-group-item px-0">{{ b.assistant_title }}</li>
+                {% empty %}
+                    <li class="list-group-item px-0 text-muted">Nenhum chatbot neste curso.</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </article>
+</div>
+{% endblock %}

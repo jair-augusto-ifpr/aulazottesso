@@ -1,37 +1,45 @@
 {% extends "website/base.html" %}
+{% load navigation_tags %}
 
 {% block title %}Painel — {{ student.name }}{% endblock %}
 
 {% block content %}
-<section class="prose">
-    <h1>Olá, {{ student.name }}</h1>
-    <p>Escolha seu curso e abra o assistente para perguntar sobre calendário, regulamentos e orientações.</p>
-</section>
+<div class="container py-4 py-lg-5">
+    <section class="mb-4">
+        <h1 class="h3 fw-bold text-ifpr-900 mb-2">Olá, {{ student.name }}</h1>
+        <p class="text-muted mb-0">Escolha seu curso e converse com o assistente do professor sobre calendário, regulamentos e orientações.</p>
+    </section>
 
-{% if not rows %}
-    <div class="card">
-        <p class="hint mb-0">Você ainda não está vinculado a nenhum curso. Peça ao responsável para associar seu cadastro no admin.</p>
-    </div>
-{% else %}
-    {% for row in rows %}
-        <section class="card course-block">
-            <h2>{{ row.course.name }}</h2>
-            {% if row.chatbots %}
-                <ul class="chatbot-list">
-                    {% for bot in row.chatbots %}
-                        <li class="chatbot-tile">
-                            <div>
-                                <span class="chatbot-tile-meta">Assistente do curso</span>
-                                <strong class="chatbot-tile-title">ChatBot #{{ bot.pk }}</strong>
-                            </div>
-                            <a class="btn btn-primary" href="{% url 'student_chat' bot.pk %}">Conversar</a>
-                        </li>
-                    {% endfor %}
-                </ul>
-            {% else %}
-                <p class="muted mb-0">Nenhum chatbot associado a este curso ainda.</p>
-            {% endif %}
-        </section>
-    {% endfor %}
-{% endif %}
+    {% if not rows %}
+        <div class="card">
+            <div class="card-body">
+                <p class="text-muted mb-0">Você ainda não está vinculado a nenhum curso. Peça ao responsável para associar seu cadastro no admin.</p>
+            </div>
+        </div>
+    {% else %}
+        {% for row in rows %}
+            <section class="card mb-3">
+                <div class="card-body">
+                    <h2 class="h5 course-block-title mb-3">{{ row.course.name }}</h2>
+                    {% if row.chatbots %}
+                        <ul class="list-unstyled d-flex flex-column gap-2 mb-0">
+                            {% for bot in row.chatbots %}
+                                <li class="chatbot-tile d-flex flex-wrap align-items-center justify-content-between gap-2 p-3">
+                                    <div>
+                                        <strong class="text-ifpr-900 d-block">{{ bot.assistant_title }}</strong>
+                                    </div>
+                                    <a class="btn btn-primary btn-sm" href="{% url 'student_chat' bot.pk %}{% nav_from_suffix %}">
+                                        <i class="bi bi-chat-dots me-1"></i>Conversar
+                                    </a>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p class="text-muted mb-0">Nenhum assistente disponível neste curso ainda.</p>
+                    {% endif %}
+                </div>
+            </section>
+        {% endfor %}
+    {% endif %}
+</div>
 {% endblock %}

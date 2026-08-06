@@ -16,22 +16,36 @@ import os
 from dotenv import load_dotenv
 from urllib.parse import urlparse, parse_qsl
 
-load_dotenv()
-
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+load_dotenv(BASE_DIR / ".env")
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-ql2inxw-1a(5qzhcd(^(j5fz)pr#b^&d%b=sakv6!c=)y(q7e("
+SECRET_KEY = os.environ.get(
+    "SECRET_KEY",
+    "django-insecure-ql2inxw-1a(5qzhcd(^(j5fz)pr#b^&d%b=sakv6!c=)y(q7e(",
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get("DEBUG", "True") == "True"
 
-ALLOWED_HOSTS = []
+_allowed_hosts = os.environ.get("ALLOWED_HOSTS", "")
+if _allowed_hosts:
+    ALLOWED_HOSTS = [h.strip() for h in _allowed_hosts.split(",") if h.strip()]
+elif DEBUG:
+    ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
+else:
+    ALLOWED_HOSTS = ["*"]
+
+_csrf_origins = os.environ.get("CSRF_TRUSTED_ORIGINS", "")
+CSRF_TRUSTED_ORIGINS = [
+    o.strip() for o in _csrf_origins.split(",") if o.strip()
+]
 
 
 # Application definition
@@ -43,13 +57,15 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    
-    #Apps
-    "website.apps.WebsiteConfig"
+    "debug_toolbar",
+    # Apps
+    "website.apps.WebsiteConfig",
 ]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
+    "debug_toolbar.middleware.DebugToolbarMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -82,8 +98,7 @@ WSGI_APPLICATION = "pw26.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 #
-# Sem DATABASE_URL no .env: SQLite local (bom para começar).
-# Com DATABASE_URL (Postgres, ex.: postgres://user:pass@host:5432/dbname): usa PostgreSQL.
+# DATABASE_URL no .env (Neon PostgreSQL). Sem a variável: SQLite local.
 
 _database_url = os.getenv("DATABASE_URL")
 if _database_url:
@@ -95,7 +110,7 @@ if _database_url:
             "USER": tmpPostgres.username,
             "PASSWORD": tmpPostgres.password,
             "HOST": tmpPostgres.hostname,
-            "PORT": tmpPostgres.port or 5432,
+            "PORT": 5432,
             "OPTIONS": dict(parse_qsl(tmpPostgres.query)),
         }
     }
@@ -141,11 +156,28 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
-STATIC_URL = "static/"
+STATIC_URL = "/static/"
+STATIC_ROOT = BASE_DIR / "static_gcloud"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 
-MEDIA_URL = "media/"
+MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
+
+_gs_bucket = os.environ.get("GS_BUCKET_NAME", "")
+if _gs_bucket:
+    STORAGES = {
+        "default": {
+            "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
+            "OPTIONS": {"bucket_name": _gs_bucket},
+        },
+        "staticfiles": {
+            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+        },
+    }
+    GS_BUCKET_NAME = _gs_bucket
+    GS_DEFAULT_ACL = None
+    GS_QUERYSTRING_AUTH = os.environ.get("GS_QUERYSTRING_AUTH", "False") == "True"
+    MEDIA_URL = f"https://storage.googleapis.com/{_gs_bucket}/"
 
 # Opcional: respostas com IA generativa (documento de pesquisa).
 # Sem chave, usa somente recuperação textual local.
@@ -157,3 +189,7 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+INTERNAL_IPS = ["127.0.0.1", "localhost"]
+
+LOGIN_URL = "student_login"

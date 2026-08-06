@@ -1,0 +1,34 @@
+{% extends "website/base.html" %}
+{% load navigation_tags %}
+
+{% block title %}{{ material }}{% endblock %}
+
+{% block content %}
+<div class="container py-4 py-lg-5">
+    {% include "website/includes/page_back.html" %}
+    <article class="card">
+        <div class="card-body">
+            <h1 class="h3 fw-bold text-ifpr-900 mb-1">{{ material.title|default:material.file.name }}</h1>
+            <p class="text-muted mb-3">Atualizado em {{ material.updated_at|date:"d/m/Y H:i" }}</p>
+            <dl class="row mb-3">
+                <dt class="col-sm-3">Público</dt>
+                <dd class="col-sm-9">{% if material.public %}Sim{% else %}Não{% endif %}</dd>
+                <dt class="col-sm-3">Cursos</dt>
+                <dd class="col-sm-9">{% for c in material.courses.all %}{{ c.name }}{% if not forloop.last %}, {% endif %}{% empty %}—{% endfor %}</dd>
+            </dl>
+            {% if material.file %}
+                <a class="btn btn-sm btn-outline-secondary mb-3" href="{{ material.file.url }}" target="_blank" rel="noopener">
+                    <i class="bi bi-box-arrow-up-right me-1"></i>Abrir arquivo
+                </a>
+            {% endif %}
+            {% if material.text_content %}
+                <h2 class="h6 text-uppercase text-muted mt-4 mb-2">Texto indexado</h2>
+                <pre class="text-preview">{{ material.text_content|truncatechars:2000 }}</pre>
+            {% endif %}
+            <div class="d-flex flex-wrap gap-2 mt-4">
+                <a class="btn btn-secondary" href="{% url 'professor_material_edit' material.pk %}{% nav_from_suffix %}">Editar</a>
+            </div>
+        </div>
+    </article>
+</div>
+{% endblock %}

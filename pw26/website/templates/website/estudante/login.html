@@ -3,19 +3,31 @@
 {% block title %}Entrar — Estudante{% endblock %}
 
 {% block content %}
-<div class="panel-narrow">
-    <div class="auth-card">
-        <h1>Área do estudante</h1>
-        <p class="auth-intro">Entre com seu <strong>RA</strong> e a senha definidas no cadastro (administrador do sistema).</p>
-        <form method="post" class="form-stack" novalidate>
-            {% csrf_token %}
-            {{ form.as_p }}
-            <button type="submit" class="btn btn-primary btn-block btn-lg">Entrar</button>
-        </form>
-        <p class="muted">
-            Ainda não tem conta?
-            <a href="{% url 'student_signup' %}">Criar conta</a>
-        </p>
+<div class="container py-4 py-lg-5">
+    <div class="row justify-content-center">
+        <div class="col-12 col-sm-9 col-md-6 col-lg-5">
+            <div class="card auth-card">
+                <div class="card-body p-4">
+                    <h1 class="h4 fw-bold text-ifpr-900 mb-2">Área do estudante</h1>
+                    <p class="text-muted mb-4">Entre com seu <strong>RA</strong> e a senha definidas no cadastro (administrador do sistema).</p>
+                    <form method="post" novalidate>
+                        {% csrf_token %}
+                        {% for field in form %}
+                            <div class="mb-3">
+                                <label for="{{ field.id_for_label }}" class="form-label fw-semibold">{{ field.label }}</label>
+                                {{ field }}
+                                {% if field.errors %}<div class="text-danger small mt-1">{{ field.errors }}</div>{% endif %}
+                            </div>
+                        {% endfor %}
+                        <button type="submit" class="btn btn-primary w-100 btn-lg">Entrar</button>
+                    </form>
+                    <p class="text-muted mt-3 mb-0">
+                        Ainda não tem conta?
+                        <a href="{% url 'student_signup' %}" class="btn btn-sm btn-outline-secondary ms-1">Criar conta</a>
+                    </p>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}

@@ -1,75 +1,194 @@
 {% extends "website/base.html" %}
+{% load static %}
 
 {% block title %}Chat — assistente{% endblock %}
 
-{% block body_class %}page-chat{% endblock %}
+{% block html_class %}page-chat-html{% endblock %}
+{% block body_class %}page-chat page-chat-gpt{% endblock %}
+
+{% block extra_css %}
+<style>
+    html.page-chat-html,
+    html.page-chat-html body.page-chat {
+        height: 100%;
+        max-height: 100dvh;
+        overflow: hidden;
+    }
+
+    html.page-chat-html body.page-chat .site-footer {
+        display: none !important;
+    }
+
+    html.page-chat-html body.page-chat .main-content,
+    html.page-chat-html body.page-chat .gpt-shell,
+    html.page-chat-html body.page-chat .gpt-main {
+        min-height: 0;
+        overflow: hidden;
+    }
+
+    html.page-chat-html body.page-chat .gpt-main {
+        display: flex;
+        flex-direction: column;
+    }
+
+    html.page-chat-html body.page-chat .gpt-messages {
+        flex: 1 1 0;
+        min-height: 0;
+        overflow-y: auto;
+    }
+
+    html.page-chat-html body.page-chat .gpt-composer {
+        flex-shrink: 0;
+    }
+</style>
+<link rel="stylesheet" href="{% static 'css/chat-gpt.css' %}?v=3">
+{% endblock %}
 
 {% block content %}
-<div class="chat-layout">
-    <header class="chat-header">
-        <a href="{% url 'student_dashboard' %}" class="back-link">← Voltar aos cursos</a>
-        <h1>Assistente do curso</h1>
-        <p class="muted">Professor(a): {{ chatbot.professor.name }}</p>
-    </header>
+<div class="gpt-shell"
+     data-send-url="{% url 'student_chat_send' chatbot.pk %}"
+     data-create-url="{% url 'student_conversation_create' chatbot.pk %}"
+     data-messages-base="{% url 'student_chat' chatbot.pk %}conversas/"
+     data-can-chat="{{ can_chat|yesno:'1,0' }}">
 
-    <div class="chat-scroll" aria-live="polite" id="historico-chat">
-        {% if not history %}
-            <p class="hint chat-empty">Exemplos: datas do calendário, prazos, regulamento ou atividades complementares.</p>
-        {% endif %}
-        {% for turn in history %}
-            {% if turn.role == "user" %}
-                <div class="bubble bubble-user">
-                    <span class="bubble-label">Você</span>
-                    <div class="bubble-body">{{ turn.content|linebreaksbr }}</div>
-                </div>
-            {% else %}
-                <div class="bubble bubble-assistant">
-                    <span class="bubble-label">Assistente</span>
-                    <div class="bubble-body">{{ turn.content|linebreaksbr }}</div>
-                    {% if turn.sources %}
-                        <details class="source-details">
-                            <summary>Fontes usadas ({{ turn.sources|length }})</summary>
-                            <div class="source-list">
-                                {% for src in turn.sources %}
-                                    <article class="source-item">
-                                        <h4>{{ src.title }}</h4>
-                                        <p>{{ src.excerpt|linebreaksbr }}</p>
-                                    </article>
-                                {% endfor %}
-                            </div>
-                        </details>
-                    {% endif %}
-                </div>
-            {% endif %}
-        {% endfor %}
-    </div>
+    <aside class="gpt-sidebar" id="gpt-sidebar" aria-label="Histórico de conversas">
+        <div class="gpt-sidebar-head">
+            <a href="{{ back_url }}" class="gpt-sidebar-back" title="{{ back_label }}">
+                <i class="bi bi-arrow-left" aria-hidden="true"></i>
+                <span>{{ back_label }}</span>
+            </a>
+            <button type="button" id="new-conversation-btn" class="gpt-sidebar-action">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                Novo chat
+            </button>
+            <label class="gpt-search-wrap">
+                <span class="visually-hidden">Buscar conversas</span>
+                <svg class="gpt-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+                <input type="search" id="conv-search" class="gpt-search" placeholder="Buscar conversas" autocomplete="off">
+            </label>
+        </div>
 
-    <div class="chat-composer">
-        <form method="post" class="form-stack" id="chat-form" data-send-url="{% url 'student_chat_send' chatbot.pk %}">
-            {% csrf_token %}
-            {{ form.as_p }}
-            <div class="chat-actions">
-                <button type="submit" class="btn btn-primary btn-lg" id="chat-submit-btn">Enviar pergunta</button>
+        <nav class="gpt-conv-nav">
+            <p class="gpt-conv-label">Chats</p>
+            <ul class="gpt-conv-list" id="conversation-list">
+                {% for c in conversations %}
+                    <li data-title="{{ c.title|default:'Nova conversa'|lower }}">
+                        <button type="button"
+                                class="gpt-conv-item {% if conversation and c.pk == conversation.pk %}is-active{% endif %}"
+                                data-conversation-id="{{ c.pk }}">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/></svg>
+                            <span class="gpt-conv-title">{{ c.title|default:"Nova conversa" }}</span>
+                        </button>
+                    </li>
+                {% endfor %}
+            </ul>
+            <p class="gpt-conv-empty" id="conv-list-empty" {% if conversations %}hidden{% endif %}>Nenhuma conversa ainda.</p>
+        </nav>
+
+        <div class="gpt-sidebar-foot">
+            <div class="gpt-user-chip">
+                <span class="gpt-user-avatar" aria-hidden="true">{{ student.name|slice:":1"|upper }}</span>
+                <div class="gpt-user-info">
+                    <span class="gpt-user-name">{{ student.name }}</span>
+                    <span class="gpt-user-meta">RA {{ student.ra }}</span>
+                </div>
             </div>
-        </form>
-    </div>
+            <p class="chat-usage" id="chat-usage" data-unlimited="{{ usage.unlimited|yesno:'1,0' }}">
+                {% if usage.unlimited %}
+                    <strong id="usage-used">{{ usage.used }}</strong> tokens · sem limite
+                {% else %}
+                    <strong id="usage-used">{{ usage.used }}</strong> / <span id="usage-limit">{{ usage.limit }}</span> tokens
+                    {% if usage.period_days %}· {{ usage.period_days }} dias{% endif %}
+                {% endif %}
+            </p>
+        </div>
+    </aside>
+
+    <div class="gpt-backdrop" id="gpt-backdrop" hidden></div>
+
+    <section class="gpt-main">
+        <header class="gpt-main-head">
+            <button type="button" class="gpt-menu-btn" id="gpt-menu-btn" aria-label="Abrir menu de conversas">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+            </button>
+            <div class="gpt-main-head-info">
+                <h1 class="gpt-main-title">{{ chatbot.assistant_title }}</h1>
+            </div>
+        </header>
+
+        {% if not can_chat %}
+            <div class="gpt-banner gpt-banner-error" id="chat-block-msg">{{ block_reason }}</div>
+        {% endif %}
+
+        <div class="gpt-messages" aria-live="polite" id="historico-chat">
+            <div class="gpt-welcome" id="chat-welcome" {% if conversation and history %}hidden{% endif %}>
+                <h2>Por onde começamos?</h2>
+                <p>Escreva sua pergunta abaixo. A conversa começa automaticamente ao enviar a primeira mensagem.</p>
+            </div>
+            <div class="gpt-messages-inner" id="chat-messages-inner">
+                {% include "website/includes/chat_bubbles.html" with messages=history %}
+            </div>
+        </div>
+
+        <footer class="gpt-composer">
+            <form class="gpt-composer-form" id="chat-form">
+                {% csrf_token %}
+                <div class="gpt-input-pill">
+                    {{ form.message }}
+                    <button type="submit"
+                            class="gpt-send-btn"
+                            id="chat-submit-btn"
+                            title="Enviar"
+                            aria-label="Enviar mensagem"
+                            {% if not can_chat %}disabled{% endif %}>
+                        <span class="gpt-send-icon" aria-hidden="true">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>
+                        </span>
+                    </button>
+                </div>
+                <p class="gpt-composer-hint">Enter envia · Shift+Enter quebra linha</p>
+            </form>
+        </footer>
+    </section>
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
     (function () {
-        var el = document.getElementById("historico-chat");
+        var root = document.querySelector(".gpt-shell");
+        var el = document.getElementById("chat-messages-inner");
+        var messagesPane = document.getElementById("historico-chat");
+        var welcome = document.getElementById("chat-welcome");
         var form = document.getElementById("chat-form");
         var submitBtn = document.getElementById("chat-submit-btn");
-        if (!el || !form || !submitBtn) return;
+        var list = document.getElementById("conversation-list");
+        var listEmpty = document.getElementById("conv-list-empty");
+        var newBtn = document.getElementById("new-conversation-btn");
+        var searchInput = document.getElementById("conv-search");
+        var sidebar = document.getElementById("gpt-sidebar");
+        var backdrop = document.getElementById("gpt-backdrop");
+        var menuBtn = document.getElementById("gpt-menu-btn");
+        if (!root || !el || !form || !submitBtn) return;
+
+        var canChat = root.dataset.canChat === "1";
+        var sendUrl = root.dataset.sendUrl;
+        var createUrl = root.dataset.createUrl;
+        var messagesBase = root.dataset.messagesBase;
+        var activeConversationId = {% if conversation %}{{ conversation.pk }}{% else %}null{% endif %};
+        var isLoading = false;
+
+        function csrf() {
+            var input = form.querySelector("input[name='csrfmiddlewaretoken']");
+            return input ? input.value : "";
+        }
 
         function scrollToBottom() {
-            el.scrollTop = el.scrollHeight;
+            if (messagesPane) messagesPane.scrollTop = messagesPane.scrollHeight;
         }
 
         function escapeHtml(text) {
-            return text
+            return (text || "")
                 .replaceAll("&", "&amp;")
                 .replaceAll("<", "&lt;")
                 .replaceAll(">", "&gt;");
@@ -81,7 +200,7 @@
 
         function sourcesHtml(sources) {
             if (!sources || !sources.length) return "";
-            var list = sources.map(function (src) {
+            var items = sources.map(function (src) {
                 return (
                     '<article class="source-item">' +
                     "<h4>" + escapeHtml(src.title || "Fonte") + "</h4>" +
@@ -91,75 +210,286 @@
             }).join("");
             return (
                 '<details class="source-details">' +
-                "<summary>Fontes usadas (" + sources.length + ")</summary>" +
-                '<div class="source-list">' + list + "</div>" +
+                "<summary>Fontes (" + sources.length + ")</summary>" +
+                '<div class="source-list">' + items + "</div>" +
                 "</details>"
             );
         }
 
-        function appendBubble(role, content, sources) {
+        function metaHtml(d) {
+            if (!d) return "";
+            var total = d.tokens_total || 0;
+            var modelStr = d.model ? escapeHtml(d.model) + " · " : "";
+            return '<span class="bubble-meta">' + modelStr + total + " tokens</span>";
+        }
+
+        function updateWelcome(hasMessages) {
+            if (welcome) welcome.hidden = !!(hasMessages && hasMessages.length);
+        }
+
+        function appendBubble(role, content, opts) {
+            opts = opts || {};
             var wrapper = document.createElement("div");
-            wrapper.className = role === "user" ? "bubble bubble-user" : "bubble bubble-assistant";
-            var label = role === "user" ? "Você" : "Assistente";
+            if (role === "user") {
+                wrapper.className = "bubble bubble-user";
+                wrapper.innerHTML = '<div class="bubble-body">' + linebreaks(content) + "</div>";
+            } else {
+                wrapper.className = "bubble bubble-assistant";
+                var html =
+                    '<div class="bubble-avatar" aria-hidden="true">AI</div>' +
+                    '<div class="bubble-content">' +
+                    '<div class="bubble-body">' + linebreaks(content) + "</div>";
+                html += metaHtml(opts);
+                html += sourcesHtml(opts.sources);
+                html += "</div>";
+                wrapper.innerHTML = html;
+            }
+            el.appendChild(wrapper);
+            updateWelcome(el.children);
+            scrollToBottom();
+            return wrapper;
+        }
+
+        function appendTyping() {
+            var wrapper = document.createElement("div");
+            wrapper.className = "bubble bubble-assistant bubble-typing";
+            wrapper.id = "chat-typing";
             wrapper.innerHTML =
-                '<span class="bubble-label">' + label + "</span>" +
-                '<div class="bubble-body">' + linebreaks(content) + "</div>" +
-                (role === "assistant" ? sourcesHtml(sources) : "");
+                '<div class="bubble-avatar" aria-hidden="true">AI</div>' +
+                '<div class="bubble-content">' +
+                '<div class="bubble-body typing-body">' +
+                '<span class="typing-dots" aria-label="Assistente digitando">' +
+                '<span></span><span></span><span></span>' +
+                "</span></div></div>";
             el.appendChild(wrapper);
             scrollToBottom();
             return wrapper;
         }
 
-        scrollToBottom();
+        function removeTyping() {
+            var node = document.getElementById("chat-typing");
+            if (node) node.remove();
+        }
+
+        function renderMessages(items) {
+            el.innerHTML = "";
+            (items || []).forEach(function (m) {
+                if (m.role === "user") appendBubble("user", m.content);
+                else appendBubble("assistant", m.content, m);
+            });
+            updateWelcome(items);
+            scrollToBottom();
+        }
+
+        function setLoading(loading) {
+            isLoading = loading;
+            submitBtn.classList.toggle("is-loading", loading);
+        }
+
+        function setComposerEnabled(enabled) {
+            var textarea = form.querySelector("textarea[name='message']");
+            if (textarea) textarea.disabled = !enabled || isLoading;
+            submitBtn.disabled = !enabled || isLoading;
+        }
+
+        function highlight(cid) {
+            if (!list) return;
+            list.querySelectorAll(".gpt-conv-item").forEach(function (btn) {
+                btn.classList.toggle("is-active", btn.dataset.conversationId === String(cid));
+            });
+        }
+
+        function setActive(cid) {
+            activeConversationId = cid ? Number(cid) : null;
+            highlight(cid);
+            setComposerEnabled(canChat);
+            if (!cid) updateWelcome([]);
+        }
+
+        function closeSidebar() {
+            if (sidebar) sidebar.classList.remove("is-open");
+            if (backdrop) backdrop.hidden = true;
+        }
+
+        function openSidebar() {
+            if (sidebar) sidebar.classList.add("is-open");
+            if (backdrop) backdrop.hidden = false;
+        }
+
+        function updateUsage(usage) {
+            if (!usage) return;
+            var used = document.getElementById("usage-used");
+            if (used) used.textContent = usage.used;
+            var limit = document.getElementById("usage-limit");
+            if (limit && usage.limit) limit.textContent = usage.limit;
+        }
+
+        function loadConversation(cid) {
+            if (!cid) {
+                renderMessages([]);
+                setActive(null);
+                return;
+            }
+            fetch(messagesBase + cid + "/mensagens/", {
+                headers: { "X-Requested-With": "XMLHttpRequest" },
+            })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    renderMessages(data.messages || []);
+                    setActive(cid);
+                })
+                .catch(function () {
+                    renderMessages([]);
+                    setActive(cid);
+                });
+            closeSidebar();
+        }
+
+        function addConversationToList(cid, title) {
+            if (!list) return;
+            var li = document.createElement("li");
+            li.dataset.title = (title || "Nova conversa").toLowerCase();
+            var btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "gpt-conv-item";
+            btn.dataset.conversationId = String(cid);
+            btn.innerHTML =
+                '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/></svg>' +
+                '<span class="gpt-conv-title">' + escapeHtml(title || "Nova conversa") + "</span>";
+            li.appendChild(btn);
+            list.insertBefore(li, list.firstChild);
+            if (listEmpty) listEmpty.hidden = true;
+        }
+
+        if (list) {
+            list.addEventListener("click", function (event) {
+                var btn = event.target.closest(".gpt-conv-item");
+                if (!btn) return;
+                loadConversation(btn.dataset.conversationId);
+            });
+        }
+
+        if (searchInput && list) {
+            searchInput.addEventListener("input", function () {
+                var q = (searchInput.value || "").trim().toLowerCase();
+                list.querySelectorAll("li").forEach(function (li) {
+                    var title = li.dataset.title || "";
+                    li.hidden = q && title.indexOf(q) === -1;
+                });
+            });
+        }
+
+        if (menuBtn) menuBtn.addEventListener("click", openSidebar);
+        if (backdrop) backdrop.addEventListener("click", closeSidebar);
+
+        if (newBtn) {
+            newBtn.addEventListener("click", function () {
+                newBtn.disabled = true;
+                fetch(createUrl, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-CSRFToken": csrf(),
+                    },
+                    body: JSON.stringify({}),
+                })
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) {
+                        if (data.conversation_id) {
+                            addConversationToList(data.conversation_id, data.title);
+                            renderMessages([]);
+                            setActive(data.conversation_id);
+                            var textarea = form.querySelector("textarea[name='message']");
+                            if (textarea) textarea.focus();
+                        }
+                    })
+                    .finally(function () { newBtn.disabled = false; });
+                closeSidebar();
+            });
+        }
+
+        var textarea = form.querySelector("textarea[name='message']");
+        if (textarea) {
+            textarea.setAttribute("placeholder", "Pergunte alguma coisa");
+            textarea.addEventListener("keydown", function (event) {
+                if (event.key === "Enter" && !event.shiftKey) {
+                    event.preventDefault();
+                    if (!submitBtn.disabled) form.requestSubmit();
+                }
+            });
+        }
 
         form.addEventListener("submit", function (event) {
             event.preventDefault();
-            var textarea = form.querySelector("textarea[name='message']");
-            if (!textarea) {
-                form.submit();
-                return;
-            }
+            if (!canChat || isLoading) return;
+            if (!textarea) return;
             var text = (textarea.value || "").trim();
             if (!text) return;
 
-            submitBtn.disabled = true;
+            setLoading(true);
+            setComposerEnabled(false);
+            if (welcome) welcome.hidden = true;
             appendBubble("user", text);
             textarea.value = "";
+            appendTyping();
 
-            var typingBubble = document.createElement("div");
-            typingBubble.className = "bubble bubble-assistant";
-            typingBubble.innerHTML =
-                '<span class="bubble-label">Assistente</span>' +
-                '<div class="bubble-body"><span class="typing-indicator" aria-hidden="true"></span> Assistente está digitando...</div>';
-            el.appendChild(typingBubble);
-            scrollToBottom();
+            var payload = { message: text };
+            if (activeConversationId) payload.conversa = activeConversationId;
 
-            var csrf = form.querySelector("input[name='csrfmiddlewaretoken']");
-            fetch(form.dataset.sendUrl, {
+            fetch(sendUrl, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    "X-CSRFToken": csrf ? csrf.value : "",
+                    "X-CSRFToken": csrf(),
                 },
-                body: JSON.stringify({ message: text }),
+                body: JSON.stringify(payload),
             })
                 .then(function (response) {
-                    if (!response.ok) throw new Error("falha");
-                    return response.json();
+                    return response.json().then(function (data) {
+                        return { ok: response.ok, data: data };
+                    });
                 })
-                .then(function (data) {
-                    typingBubble.remove();
-                    appendBubble("assistant", data.reply || "Sem resposta.", data.sources || []);
+                .then(function (res) {
+                    removeTyping();
+                    if (!res.ok) {
+                        appendBubble("assistant", res.data.error || "Não foi possível responder agora.");
+                        return;
+                    }
+                    if (res.data.conversation_id) {
+                        if (!list || !list.querySelector('.gpt-conv-item[data-conversation-id="' + res.data.conversation_id + '"]')) {
+                            addConversationToList(
+                                res.data.conversation_id,
+                                res.data.conversation_title || "Nova conversa"
+                            );
+                        }
+                        setActive(res.data.conversation_id);
+                    }
+                    appendBubble("assistant", res.data.reply || "Sem resposta.", res.data);
+                    updateUsage(res.data.usage);
+                    if (res.data.conversation_title && list && res.data.conversation_id) {
+                        var active = list.querySelector('.gpt-conv-item[data-conversation-id="' + res.data.conversation_id + '"] .gpt-conv-title');
+                        if (active) active.textContent = res.data.conversation_title;
+                        var li = list.querySelector('.gpt-conv-item[data-conversation-id="' + res.data.conversation_id + '"]');
+                        if (li && li.parentElement) {
+                            li.parentElement.dataset.title = res.data.conversation_title.toLowerCase();
+                        }
+                    }
                 })
                 .catch(function () {
-                    typingBubble.remove();
+                    removeTyping();
                     textarea.value = text;
-                    form.submit();
+                    appendBubble("assistant", "Erro de conexão. Tente novamente.");
                 })
                 .finally(function () {
-                    submitBtn.disabled = false;
+                    setLoading(false);
+                    setComposerEnabled(canChat);
+                    textarea.focus();
                 });
         });
+
+        setComposerEnabled(canChat);
+        if (activeConversationId) highlight(activeConversationId);
+        scrollToBottom();
     })();
 </script>
 {% endblock %}

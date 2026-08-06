@@ -1,0 +1,30 @@
+{% extends "website/base.html" %}
+{% load navigation_tags %}
+
+{% block title %}{{ chatbot.assistant_title }}{% endblock %}
+
+{% block content %}
+<div class="container py-4 py-lg-5">
+    {% include "website/includes/page_back.html" %}
+    <article class="card">
+        <div class="card-body">
+            <h1 class="h3 fw-bold text-ifpr-900 mb-1">{{ chatbot.assistant_title }}</h1>
+            <p class="text-muted mb-3">Professor: {{ chatbot.owner.name }}</p>
+
+            <h2 class="h6 text-uppercase text-muted mb-2">Prompt</h2>
+            <pre class="text-preview">{{ chatbot.prompt }}</pre>
+
+            <dl class="row mt-3 mb-3">
+                <dt class="col-sm-3">Cursos</dt>
+                <dd class="col-sm-9">{% for c in chatbot.courses.all %}{{ c.name }}{% if not forloop.last %}, {% endif %}{% empty %}—{% endfor %}</dd>
+                <dt class="col-sm-3">Materiais vinculados</dt>
+                <dd class="col-sm-9">{{ chatbot.materials.count }}</dd>
+            </dl>
+
+            <div class="d-flex flex-wrap gap-2 mt-4">
+                <a class="btn btn-secondary" href="{% url 'professor_chatbot_edit' chatbot.pk %}{% nav_from_suffix %}">Editar</a>
+            </div>
+        </div>
+    </article>
+</div>
+{% endblock %}
