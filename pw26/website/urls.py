@@ -50,6 +50,11 @@ urlpatterns = [
         views.StudentConversationMessagesView.as_view(),
         name="student_conversation_messages",
     ),
+    path(
+        "estudante/materiais/<int:material_id>/download/",
+        views.StudentMaterialDownloadView.as_view(),
+        name="student_material_download",
+    ),
     # Professor — autenticação
     path(
         "professor/cadastrar/",

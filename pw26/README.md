@@ -57,12 +57,14 @@ Projeto alinhado ao **Plano de Atividades de Programação Web 2026** (3 trimest
 
 ---
 
-## Arquitetura
+## Arquitetura e RAG Econômico
 
 ```
-Navegador → Django CBVs → chat_service (RAG) → Gemini/OpenRouter
-                ↓
-         SQLite / PostgreSQL + media/GCS
+Navegador → Django CBVs → IA 1 (Roteador JSON) → Recuperação Híbrida (Lexical + Vetorial / RRF)
+                ↓                                               ↓
+        LLMCallLog (Auditoria)                     IA 2 (Gerador Delimitado [F1]...[Fn])
+                ↓                                               ↓
+         SQLite / PostgreSQL + GCS                 Message + Fontes Enriquecidas
 ```
 
 ---
@@ -70,27 +72,40 @@ Navegador → Django CBVs → chat_service (RAG) → Gemini/OpenRouter
 ## Modelo de dados
 
 ```
-User (Django) ──1:1── Professor ──1:1── ProfessorConfig
-                      Professor ──1:N── Material, ChatBot
-              └──1:1── Student ──1:N── Conversation ──1:N── Message
+User (Django) ──1:1── Professor ──1:1── ProfessorConfig (rag_mode, router_model, embedding_model)
+                      Professor ──1:N── Material ──1:N── MaterialChunk (~450 tokens)
+                                ──1:N── ChatBot
+              └──1:1── Student ──1:N── Conversation ──1:N── Message (fontes, tokens)
+                               ──1:N── LLMCallLog (auditoria independente)
 Course ──N:N── Professor, Student, Material, ChatBot
 ```
 
-`Message` guarda, além do conteúdo, o **provedor**, o **modelo** e as **estatísticas de tokens** (`tokens_prompt`, `tokens_completion`, `tokens_total`, `tokens_cached`).
+`Message` guarda o conteúdo, o provedor, o modelo e as fontes com procedência exata ([F1], página/seção, link de download autorizado). `LLMCallLog` rastreia cada chamada das etapas (roteador, gerador, embeddings), preservando o consumo de tokens mesmo se a conversa for excluída.
 
 ---
 
 ## Como o chat funciona
 
-1. **Iniciar/continuar conversa** — o aluno cria uma "Nova conversa" (ou seleciona uma anterior) antes de enviar; o campo de envio fica desativado até haver conversa ativa
-2. **Recuperação** — tokenização e busca em `title` / `text_content` dos materiais do chatbot
-3. **Geração** — usa **a API do próprio professor** (`ProfessorConfig`: Gemini ou OpenRouter). Sem API configurada, o envio é **bloqueado**
-4. **Limite de tokens** — cada professor define um limite de tokens por aluno e um período (dias); ao atingir, o envio é bloqueado
-5. **Persistência (AJAX)** — pergunta/resposta viram `Message`, com modelo e tokens exibidos em cada mensagem; envio/recebimento por AJAX com spinner e botão desabilitado durante a espera
+1. **Início da conversa** — o aluno pode iniciar uma nova conversa ou ela é criada automaticamente no primeiro envio.
+2. **IA 1 (Roteamento e Classificação)** — o classificador analisa a pergunta e a memória curta, retornando intenção, categorias documentais e termos de busca com validação de esquema estrita.
+3. **Recuperação Híbrida Persistida** — busca lexical e vetorial sobre `MaterialChunk` dos materiais autorizados do chatbot, combinados via *Reciprocal Rank Fusion* (RRF) com orçamento documental controlado (até 2.400 tokens).
+4. **IA 2 (Geração com Citações)** — o gerador recebe os trechos delimitados como dados, a data real calculada no servidor e histórico recente (até 500 tokens), citando fontes com badges `[F1]`, `[F2]`.
+5. **Download Autorizado** — o aluno pode baixar os documentos citados via endpoint seguro que revalida o vínculo do estudante ao curso/chatbot do material.
+6. **Limite de tokens** — cada professor define um limite de tokens por aluno e um período (dias); o consumo total auditado é debitado com base em `LLMCallLog`.
+7. **Modos de Operação do RAG** — configuráveis pelo professor em `/professor/configuracao/`:
+   - `two_stage`: Duas etapas (Roteador + Recuperação Híbrida + Gerador) [Padrão]
+   - `direct`: RAG Direto (Recuperação Híbrida + Gerador)
+   - `baseline`: Baseline comparativo (até 8 prefixos de 20.000 caracteres)
 
-### Configuração de API do professor
+### Comandos de Gestão e Avaliação
 
-O professor acessa `/professor/configuracao/` e informa provedor, chave, modelo, limite de tokens por aluno e período. Ele também monitora (somente leitura) todas as conversas dos seus chatbots e o consumo por aluno em `/professor/conversas/`.
+```bash
+# Reextrai texto e particiona chunks de materiais (suporta --dry-run, --material-id, --force):
+python manage.py reextract_materials
+
+# Executa benchmark comparativo sistemático entre estratégias A, B e C:
+python manage.py evaluate_rag
+```
 
 > Nota de segurança: no protótipo a chave de API fica em texto puro no banco. Em produção, considere criptografar ou usar um cofre de segredos.
 

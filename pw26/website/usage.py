@@ -1,4 +1,4 @@
-"""Cálculo de consumo e limite de tokens por aluno em cada professor."""
+"""Cálculo de consumo e limite de tokens por aluno em cada professor com suporte a LLMCallLog."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from datetime import timedelta
 from django.db.models import Sum
 from django.utils import timezone
 
-from .models import Message, Professor, ProfessorConfig, Student
+from .models import LLMCallLog, Message, Professor, ProfessorConfig, Student
 
 
 def get_config(professor: Professor) -> ProfessorConfig | None:
@@ -20,7 +20,26 @@ def consumed_tokens(
     *,
     period_days: int | None = None,
 ) -> int:
-    """Soma os tokens das respostas do assistente para o aluno nos chatbots do professor."""
+    """Soma os tokens consumidos em todas as etapas (roteamento e geração).
+
+    Utiliza LLMCallLog como fonte primária de auditoria imutável (preservando o consumo
+    mesmo após exclusão de conversas ou mensagens). Caso não haja logs, realiza fallback
+    para contagem em Message (retrocompatibilidade para bases antigas).
+    """
+    qs_logs = LLMCallLog.objects.filter(
+        professor=professor,
+        student=student,
+        tokens_total__gt=0,
+    )
+    if period_days:
+        since = timezone.now() - timedelta(days=period_days)
+        qs_logs = qs_logs.filter(created_at__gte=since)
+
+    total_logs = qs_logs.aggregate(total=Sum("tokens_total"))["total"]
+    if total_logs is not None and total_logs > 0:
+        return total_logs
+
+    # Fallback para histórico legado em Message
     qs = Message.objects.filter(
         role=Message.ROLE_ASSISTANT,
         conversation__student=student,

@@ -1,12 +1,14 @@
 import json
+from pathlib import Path
 
 from django.contrib import messages
 from django.contrib.auth import login
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.models import Group, User
 from django.contrib.auth.views import LoginView, LogoutView, PasswordChangeView
+from django.core.exceptions import PermissionDenied
 from django.db.models import Count, Q, Sum
-from django.http import JsonResponse
+from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.views import View
@@ -21,6 +23,7 @@ from django.views.generic import (
 
 from .chat_service import build_answer
 from .constants import GROUP_ALUNO, GROUP_PROFESSOR
+from .document_processing import index_material
 from .forms import (
     ChatBotForm,
     ChatMessageForm,
@@ -57,7 +60,20 @@ from .usage import can_send, consumed_tokens, usage_summary
 
 
 def _serialize_snippets(snippets):
-    return [{"title": s.title, "excerpt": s.excerpt} for s in snippets]
+    serialized = []
+    for s in snippets:
+        serialized.append(
+            {
+                "title": getattr(s, "title", ""),
+                "excerpt": getattr(s, "excerpt", ""),
+                "citation_id": getattr(s, "citation_id", ""),
+                "page_or_section": getattr(s, "page_or_section", ""),
+                "download_url": getattr(s, "download_url", ""),
+                "material_id": getattr(s, "material_id", None),
+                "category": getattr(s, "category", ""),
+            }
+        )
+    return serialized
 
 
 def _serialize_message(msg):
@@ -75,7 +91,7 @@ def _serialize_message(msg):
     }
 
 
-def _answer_and_store(chatbot, conversation, text):
+def _answer_and_store(chatbot, conversation, text, request_id=""):
     """Aplica limites, chama a IA e persiste as mensagens. Retorna dict de resultado."""
     professor = chatbot.owner
     config = getattr(professor, "config", None)
@@ -85,7 +101,14 @@ def _answer_and_store(chatbot, conversation, text):
     if not ok:
         return {"ok": False, "status": 403, "error": reason}
 
-    result = build_answer(chatbot, text, include_private=True, config=config)
+    result = build_answer(
+        chatbot,
+        text,
+        include_private=True,
+        config=config,
+        conversation=conversation,
+        request_id=request_id,
+    )
     if result.error:
         return {"ok": False, "status": 502, "error": result.error}
 
@@ -494,7 +517,14 @@ class StudentChatSendView(StudentRequiredMixin, View):
         if not text:
             return JsonResponse({"error": "Mensagem vazia."}, status=400)
 
-        outcome = _answer_and_store(chatbot, conversation, text)
+        request_id = (
+            request.headers.get("X-Request-ID")
+            or payload.get("request_id")
+            or ""
+        )
+        outcome = _answer_and_store(
+            chatbot, conversation, text, request_id=request_id
+        )
         if not outcome["ok"]:
             return JsonResponse({"error": outcome["error"]}, status=outcome["status"])
 
@@ -512,6 +542,41 @@ class StudentChatSendView(StudentRequiredMixin, View):
             }
         )
         return JsonResponse(data)
+
+
+class StudentMaterialDownloadView(StudentRequiredMixin, View):
+    """Permite ao estudante autenticado baixar documentos autorizados referenciados no chat."""
+
+    def get(self, request, material_id):
+        student = self.get_student()
+        material = get_object_or_404(Material, pk=material_id)
+
+        # Regra de autorização estrita: o estudante só pode baixar se estiver matriculado
+        # em um curso associado ao material ou a um chatbot que utilize o material
+        student_courses = set(student.courses.values_list("pk", flat=True))
+        material_courses = set(material.courses.values_list("pk", flat=True))
+        chatbot_courses = set(
+            Course.objects.filter(chatbots__materials=material).values_list(
+                "pk", flat=True
+            )
+        )
+
+        has_access = bool(student_courses & (material_courses | chatbot_courses))
+        if not has_access:
+            raise PermissionDenied("Você não tem permissão para acessar este material.")
+
+        if not material.file:
+            raise Http404("Este material não possui arquivo para download.")
+
+        filename = Path(material.file.name).name
+        try:
+            return FileResponse(
+                material.file.open("rb"),
+                as_attachment=True,
+                filename=filename,
+            )
+        except Exception:
+            raise Http404("Arquivo não encontrado no armazenamento.")
 
 
 # ---------------------------------------------------------------------------
@@ -659,6 +724,12 @@ class MaterialCreateView(FormTemplateMixin, ProfessorRequiredMixin, CreateView):
                 "Arquivo anexado, mas não foi possível extrair texto. "
                 "Use PDF com texto selecionável ou preencha o campo de texto manualmente.",
             )
+        index_res = index_material(material, force=True)
+        if index_res.get("chunk_count"):
+            messages.info(
+                self.request,
+                f"Indexação documental concluída: {index_res['chunk_count']} trecho(s) particionado(s).",
+            )
         messages.success(self.request, "Material cadastrado.")
         return response
 
@@ -704,6 +775,12 @@ class MaterialUpdateView(
                 self.request,
                 "Arquivo anexado, mas não foi possível extrair texto. "
                 "Use PDF com texto selecionável ou preencha o campo de texto manualmente.",
+            )
+        index_res = index_material(material, force=file_changed)
+        if index_res.get("chunk_count") and index_res.get("updated"):
+            messages.info(
+                self.request,
+                f"Índice documental atualizado: {index_res['chunk_count']} trecho(s).",
             )
         messages.success(self.request, "Material atualizado.")
         return redirect(self.get_success_url())

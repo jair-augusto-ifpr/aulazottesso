@@ -208,29 +208,32 @@ Course ──N:N── Professor, Student, Material, ChatBot
 - Estudante só vê conversas próprias (`StudentOwnerQuerysetMixin`).
 - Professor só monitora conversas dos chatbots que possui.
 
-### 5.2 Chat e IA
+### 5.2 Chat e Recuperação Híbrida (RAG Econômico)
 
-1. **Recuperação** — `retrieve_snippets()` tokeniza a pergunta e pontua materiais do chatbot por match em `title` / `text_content`. Inclui materiais privados no contexto enviado à IA (`include_private=True` no envio).
-2. **Geração** — `build_answer()` usa `ProfessorConfig` do dono do chatbot (Gemini ou OpenRouter).
-3. **Bloqueios de envio** (`can_send()`):
-   - Professor sem API configurada → mensagem de erro ao aluno
+1. **Roteador / Classificador (IA 1)** — analisa a pergunta do estudante e a memória curta recente contra o catálogo de categorias dos materiais autorizados. Retorna JSON estrito com intenção, até 3 categorias e até 5 termos para orientar a busca.
+2. **Recuperação Híbrida e RRF** — busca lexical e vetorial sobre os trechos (`MaterialChunk`, ~450 tokens) dos materiais vinculados ao chatbot. Aplica fusão por *Reciprocal Rank Fusion* (RRF) e reforço de categorias selecionadas pelo roteador. Orçamento máximo de contexto documental limitado a 2.400 tokens (selecionando tipicamente 3 a 5 trechos mais relevantes).
+3. **Gerador de Resposta (IA 2)** — responde com base estrita nos dados documentais recuperados delimitados como dados (proteção contra prompt injection), data real do servidor (`_current_date_sentence()`) e histórico recente (até 2 pares, <= 500 tokens). Cita as fontes como `[F1]`, `[F2]`.
+4. **Bloqueios de envio** (`can_send()`):
+   - Professor sem API configurada → bloqueio e mensagem orientadora ao aluno
    - Limite de tokens do aluno atingido no período → bloqueio
-4. **Conversa** — criada automaticamente no primeiro envio se não houver conversa ativa; também pode ser criada via botão **Novo chat** na sidebar.
-5. **Título** — primeira mensagem do usuário vira título da conversa (até 120 caracteres).
-6. **Data atual** — injetada no prompt para cálculos de calendário.
-7. **Persistência** — cada troca gera `Message` com tokens, modelo e fontes (snippets).
+5. **Conversa** — criada automaticamente no primeiro envio se não houver conversa ativa; também pode ser iniciada via botão **Novo chat** na sidebar.
+6. **Título** — primeira mensagem do usuário vira título da conversa (até 120 caracteres).
+7. **Persistência e Auditoria** — cada troca gera `Message` com tokens, modelo e fontes enriquecidas (com badge de citação, página/seção e link de download autorizado). Cada chamada aos modelos (IA 1 e IA 2) é auditada em `LLMCallLog`.
 
-### 5.3 Limites de tokens (`website/usage.py`)
+### 5.3 Limites de tokens e Auditoria (`website/usage.py`)
 
-- `consumed_tokens()` — soma `tokens_total` das respostas do assistente por aluno/professor
-- `remaining_tokens()` — limite configurado menos consumo
-- `usage_summary()` — exibido no chat do aluno e no monitoramento do professor
-- Período: últimos N dias se `limit_period_days > 0`; senão acumulado total
+- `consumed_tokens()` — utiliza `LLMCallLog` como fonte auditável primária (preservando o consumo real mesmo se o estudante excluir a conversa posteriormente), com fallback para `Message` em registros legados.
+- `remaining_tokens()` — limite configurado menos consumo auditado.
+- `usage_summary()` — exibido no chat do aluno e no monitoramento do professor.
+- Período: últimos N dias se `limit_period_days > 0`; senão acumulado total.
+- Falhas parciais (ex.: IA 1 executou mas IA 2 falhou) mantêm o consumo da etapa executada auditado sem devolução indevida de cota.
 
-### 5.4 Materiais
+### 5.4 Materiais e Indexação de Chunks
 
 - Campo `public` controla visibilidade na recuperação pública (listagens/índice).
-- Upload com extração automática de texto (`text_extraction.py`) quando `text_content` está vazio.
+- Upload com extração automática aprimorada de PDF (páginas reais, detecção de escaneamento) e DOCX (parágrafos e tabelas com linhas/colunas).
+- Particionamento determinístico em chunks de ~450 tokens (`MaterialChunk`) com hash de conteúdo para indexação idempotente.
+- Download de arquivos para estudantes autenticados (`student_material_download`) condicionado à matrícula em curso associado ao material ou chatbot.
 - Filtro na lista: `?q=` busca em título, texto e nome de curso.
 
 ---

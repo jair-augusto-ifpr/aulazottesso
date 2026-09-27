@@ -208,13 +208,29 @@ class CourseForm(forms.ModelForm):
 class MaterialForm(forms.ModelForm):
   class Meta:
     model = Material
-    fields = ["title", "text_content", "file", "public", "courses"]
+    fields = [
+      "title",
+      "category",
+      "document_year",
+      "document_number",
+      "text_content",
+      "file",
+      "public",
+      "courses",
+    ]
     widgets = {
       "title": forms.TextInput(
         attrs={
           **INPUT_CLASS,
           "placeholder": "Ex.: Calendário acadêmico 2026",
         }
+      ),
+      "category": forms.Select(attrs=SELECT_CLASS),
+      "document_year": forms.NumberInput(
+        attrs={**INPUT_CLASS, "placeholder": "Ex.: 2026"}
+      ),
+      "document_number": forms.TextInput(
+        attrs={**INPUT_CLASS, "placeholder": "Ex.: Edital 01/2026"}
       ),
       "text_content": forms.Textarea(
         attrs={
@@ -276,6 +292,9 @@ class ProfessorConfigForm(forms.ModelForm):
       "provider",
       "api_key",
       "model",
+      "router_model",
+      "embedding_model",
+      "rag_mode",
       "token_limit_per_student",
       "limit_period_days",
     ]
@@ -291,6 +310,19 @@ class ProfessorConfigForm(forms.ModelForm):
           "placeholder": "Ex.: gemini-2.5-flash ou openrouter/…",
         }
       ),
+      "router_model": forms.TextInput(
+        attrs={
+          **INPUT_CLASS,
+          "placeholder": "Opcional. Se vazio, usa o mesmo modelo principal",
+        }
+      ),
+      "embedding_model": forms.TextInput(
+        attrs={
+          **INPUT_CLASS,
+          "placeholder": "Opcional. Ex.: text-embedding-004",
+        }
+      ),
+      "rag_mode": forms.Select(attrs=SELECT_CLASS),
       "token_limit_per_student": forms.NumberInput(
         attrs={**INPUT_CLASS, "min": 0}
       ),

@@ -18,8 +18,19 @@
                         <div class="source-list">
                             {% for src in turn.sources %}
                                 <article class="source-item">
-                                    <h4>{{ src.title }}</h4>
+                                    <h4>
+                                        {% if src.citation_id %}<span class="badge bg-secondary me-1" style="font-size:0.75rem;">{{ src.citation_id }}</span>{% endif %}
+                                        {{ src.title }}
+                                        {% if src.page_or_section %}<small class="text-muted ms-1" style="font-size:0.8rem;">({{ src.page_or_section }})</small>{% endif %}
+                                    </h4>
                                     <p>{{ src.excerpt|linebreaksbr }}</p>
+                                    {% if src.download_url %}
+                                        <div class="mt-1">
+                                            <a href="{{ src.download_url }}" class="btn btn-sm btn-outline-primary py-0 px-2" style="font-size:0.75rem;" target="_blank" rel="noopener">
+                                                Baixar documento
+                                            </a>
+                                        </div>
+                                    {% endif %}
                                 </article>
                             {% endfor %}
                         </div>
