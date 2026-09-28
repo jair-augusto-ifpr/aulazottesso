@@ -1,12 +1,12 @@
 {% extends "website/base.html" %}
-{% load static %}
+{% load static chat_tags %}
 
 {% block title %}Conversa — {{ conversation.title|default:"sem título" }}{% endblock %}
 
 {% block body_class %}page-chat page-chat-gpt page-chat-readonly{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'css/chat-gpt.css' %}">
+<link rel="stylesheet" href="{% static 'css/chat-gpt.css' %}?v=4">
 {% endblock %}
 
 {% block content %}
@@ -90,7 +90,7 @@
                             <div class="bubble bubble-assistant">
                                 <div class="bubble-avatar" aria-hidden="true">AI</div>
                                 <div class="bubble-content">
-                                    <div class="bubble-body">{{ msg.content|linebreaksbr }}</div>
+                                    <div class="bubble-body">{{ msg.content|format_assistant:msg.sources }}</div>
                                     <span class="bubble-meta">
                                         {% if msg.model_name %}{{ msg.model_name }} · {% endif %}
                                         {{ msg.tokens_total }} tokens · {{ msg.created_at|date:"d/m/Y H:i" }}
@@ -100,8 +100,11 @@
                                             <summary>Fontes ({{ msg.sources|length }})</summary>
                                             <div class="source-list">
                                                 {% for src in msg.sources %}
-                                                    <article class="source-item">
-                                                        <h4>{{ src.title }}</h4>
+                                                    <article class="source-item" {% if src.citation_id %}data-cite="{{ src.citation_id|citation_key }}"{% endif %}>
+                                                        <h4>
+                                                            {% if src.citation_id %}<span class="cite-badge">{{ src.citation_id|citation_label }}</span>{% endif %}
+                                                            {{ src.title }}
+                                                        </h4>
                                                         <p>{{ src.excerpt|linebreaksbr }}</p>
                                                     </article>
                                                 {% endfor %}
@@ -152,4 +155,5 @@
         if (pane) pane.scrollTop = pane.scrollHeight;
     })();
 </script>
+<script src="{% static 'js/chat-citations.js' %}?v=1"></script>
 {% endblock %}

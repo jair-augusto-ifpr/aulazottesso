@@ -41,7 +41,7 @@
         flex-shrink: 0;
     }
 </style>
-<link rel="stylesheet" href="{% static 'css/chat-gpt.css' %}?v=3">
+<link rel="stylesheet" href="{% static 'css/chat-gpt.css' %}?v=4">
 {% endblock %}
 
 {% block content %}
@@ -191,21 +191,49 @@
             return (text || "")
                 .replaceAll("&", "&amp;")
                 .replaceAll("<", "&lt;")
-                .replaceAll(">", "&gt;");
+                .replaceAll(">", "&gt;")
+                .replaceAll('"', "&quot;")
+                .replaceAll("'", "&#x27;");
         }
 
         function linebreaks(text) {
             return escapeHtml(text).replaceAll("\n", "<br>");
         }
 
+        function citationParts(citationId) {
+            var match = /^\[([A-Za-z])(\d+)\]$/.exec((citationId || "").trim());
+            if (!match) return null;
+            return { key: match[1] + match[2], number: match[2], label: "Fonte " + match[2] };
+        }
+
+        function formatAssistant(text, sources) {
+            var escaped = escapeHtml(text).replace(/\*\*([\s\S]+?)\*\*/g, "<strong>$1</strong>");
+            var byId = {};
+            (sources || []).forEach(function (src) {
+                if (src && src.citation_id && !byId[src.citation_id]) byId[src.citation_id] = src;
+            });
+            escaped = escaped.replace(/\[([A-Za-z])(\d+)\]/g, function (raw, letter, number) {
+                var src = byId["[" + letter + number + "]"];
+                if (!src) return raw;
+                var title = String(src.title || "Fonte").replace(/\s+/g, " ").trim() || "Fonte";
+                var label = escapeHtml("Fonte " + number + ": " + title);
+                return '<button type="button" class="cite-chip" data-cite="' + escapeHtml(letter + number) + '" title="' + label + '" aria-label="' + label + '">' + escapeHtml(number) + "</button>";
+            });
+            return escaped.replaceAll("\n", "<br>");
+        }
+
         function sourcesHtml(sources) {
             if (!sources || !sources.length) return "";
             var items = sources.map(function (src) {
-                var citeBadge = src.citation_id ? '<span class="badge bg-secondary me-1" style="font-size:0.75rem;padding:2px 6px;border-radius:4px;background:#6c757d;color:#fff;">' + escapeHtml(src.citation_id) + '</span> ' : '';
+                var parts = citationParts(src.citation_id);
+                var citeAttr = parts ? ' data-cite="' + escapeHtml(parts.key) + '"' : "";
+                var citeBadge = parts
+                    ? '<span class="cite-badge">' + escapeHtml(parts.label) + "</span> "
+                    : (src.citation_id ? '<span class="cite-badge">' + escapeHtml(src.citation_id) + "</span> " : "");
                 var pageStr = src.page_or_section ? ' <small class="text-muted" style="font-size:0.8rem;color:#888;">(' + escapeHtml(src.page_or_section) + ')</small>' : '';
                 var downloadLink = src.download_url ? '<div style="margin-top:4px;"><a href="' + escapeHtml(src.download_url) + '" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary" style="font-size:0.75rem;padding:2px 8px;text-decoration:none;border:1px solid #0d6efd;color:#0d6efd;border-radius:4px;">Baixar documento</a></div>' : '';
                 return (
-                    '<article class="source-item">' +
+                    '<article class="source-item"' + citeAttr + ">" +
                     "<h4>" + citeBadge + escapeHtml(src.title || "Fonte") + pageStr + "</h4>" +
                     "<p>" + linebreaks(src.excerpt || "") + "</p>" +
                     downloadLink +
@@ -242,7 +270,7 @@
                 var html =
                     '<div class="bubble-avatar" aria-hidden="true">AI</div>' +
                     '<div class="bubble-content">' +
-                    '<div class="bubble-body">' + linebreaks(content) + "</div>";
+                    '<div class="bubble-body">' + formatAssistant(content, opts.sources) + "</div>";
                 html += metaHtml(opts);
                 html += sourcesHtml(opts.sources);
                 html += "</div>";
@@ -496,4 +524,5 @@
         scrollToBottom();
     })();
 </script>
+<script src="{% static 'js/chat-citations.js' %}?v=1"></script>
 {% endblock %}

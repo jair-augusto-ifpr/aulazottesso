@@ -1,3 +1,4 @@
+{% load chat_tags %}
 {% for turn in messages %}
     {% if turn.role == "user" %}
         <div class="bubble bubble-user">
@@ -7,9 +8,9 @@
         <div class="bubble bubble-assistant">
             <div class="bubble-avatar" aria-hidden="true">AI</div>
             <div class="bubble-content">
-                <div class="bubble-body">{{ turn.content|linebreaksbr }}</div>
+                <div class="bubble-body">{{ turn.content|format_assistant:turn.sources }}</div>
                 <span class="bubble-meta">
-                    {% if turn.model or turn.model_name %}{{ turn.model|default:turn.model_name }} · {% endif %}
+                    {% if turn.model %}{{ turn.model }} · {% endif %}
                     {{ turn.tokens_total }} tokens
                 </span>
                 {% if turn.sources %}
@@ -17,9 +18,9 @@
                         <summary>Fontes ({{ turn.sources|length }})</summary>
                         <div class="source-list">
                             {% for src in turn.sources %}
-                                <article class="source-item">
+                                <article class="source-item" {% if src.citation_id %}data-cite="{{ src.citation_id|citation_key }}"{% endif %}>
                                     <h4>
-                                        {% if src.citation_id %}<span class="badge bg-secondary me-1" style="font-size:0.75rem;">{{ src.citation_id }}</span>{% endif %}
+                                        {% if src.citation_id %}<span class="cite-badge">{{ src.citation_id|citation_label }}</span>{% endif %}
                                         {{ src.title }}
                                         {% if src.page_or_section %}<small class="text-muted ms-1" style="font-size:0.8rem;">({{ src.page_or_section }})</small>{% endif %}
                                     </h4>

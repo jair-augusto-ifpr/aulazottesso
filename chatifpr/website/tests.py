@@ -5,6 +5,7 @@ from django.contrib.auth.models import Group, User
 from django.test import TestCase
 from django.urls import reverse
 
+from .chat_format import citation_label, format_assistant_html
 from .chat_service import AnswerResult, RetrievedSnippet, retrieve_snippets
 from .constants import GROUP_ALUNO, GROUP_PROFESSOR
 from .models import (
@@ -1061,4 +1062,53 @@ class LoadTestCalendarioTests(TestCase):
         self.assertIn("Aluno Carga 01", markdown)
         self.assertIn("timeout simulado", markdown)
         self.assertIn("10 fevereiro", markdown)
+
+
+class ChatFormatTests(TestCase):
+    def test_bold_and_plain_text(self):
+        rendered = format_assistant_html("O dia **19 de dezembro** e **2026**.")
+        self.assertIn("<strong>19 de dezembro</strong>", rendered)
+        self.assertIn("<strong>2026</strong>", rendered)
+        self.assertNotIn("**", rendered)
+        self.assertEqual(format_assistant_html("Sem marcação."), "Sem marcação.")
+
+    def test_escapes_html_before_bold(self):
+        rendered = format_assistant_html('<script>alert(1)</script> **ok**')
+        self.assertNotIn("<script>", rendered)
+        self.assertIn("&lt;script&gt;", rendered)
+        self.assertIn("<strong>ok</strong>", rendered)
+
+    def test_known_citation_becomes_chip(self):
+        rendered = format_assistant_html(
+            "Encerra em dezembro [F1].",
+            [{"citation_id": "[F1]", "title": "Calendário acadêmico 2026"}],
+        )
+        self.assertIn('class="cite-chip"', rendered)
+        self.assertIn('data-cite="F1"', rendered)
+        self.assertIn('aria-label="Fonte 1: Calendário acadêmico 2026"', rendered)
+        self.assertIn(">1</button>", rendered)
+        self.assertNotIn("[F1]", rendered)
+        self.assertEqual(citation_label("[F1]"), "Fonte 1")
+
+    def test_memory_citation_and_unknown_id(self):
+        rendered = format_assistant_html(
+            "Veja [M12] e também [F2].",
+            [{"citation_id": "[M12]", "title": "Histórico"}],
+        )
+        self.assertIn('data-cite="M12"', rendered)
+        self.assertIn("Fonte 12: Histórico", rendered)
+        self.assertIn("[F2]", rendered)
+        self.assertEqual(rendered.count("cite-chip"), 1)
+
+    def test_citation_title_is_escaped(self):
+        rendered = format_assistant_html(
+            "[F1]",
+            [{"citation_id": "[F1]", "title": 'A "B" <C>'}],
+        )
+        self.assertNotIn("<C>", rendered)
+        self.assertIn("&lt;C&gt;", rendered)
+        self.assertIn("&quot;B&quot;", rendered)
+
+    def test_newlines_become_breaks(self):
+        self.assertEqual(format_assistant_html("a\nb"), "a<br>b")
 

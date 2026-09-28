@@ -699,6 +699,48 @@ body.page-chat .gpt-shell {
     color: var(--gpt-muted);
 }
 
+.page-chat-gpt .cite-chip {
+    display: inline-block;
+    min-width: 1.15rem;
+    margin: 0 0.1rem;
+    padding: 0.05rem 0.32rem;
+    border: 1px solid var(--ifpr-200, var(--gpt-border));
+    border-radius: 999px;
+    background: var(--ifpr-50);
+    color: var(--ifpr-800);
+    font: inherit;
+    font-size: 0.68rem;
+    font-weight: 700;
+    line-height: 1.35;
+    vertical-align: super;
+    cursor: pointer;
+}
+
+.page-chat-gpt .cite-chip:hover,
+.page-chat-gpt .cite-chip:focus-visible {
+    background: var(--ifpr-600);
+    border-color: var(--ifpr-600);
+    color: #fff;
+    outline: none;
+}
+
+.page-chat-gpt .cite-badge {
+    display: inline-block;
+    margin-right: 0.35rem;
+    padding: 0.05rem 0.4rem;
+    border-radius: 999px;
+    background: var(--ifpr-50);
+    color: var(--ifpr-800);
+    font-size: 0.72rem;
+    font-weight: 700;
+    vertical-align: middle;
+}
+
+.page-chat-gpt .source-item.is-cited {
+    border-color: var(--ifpr-600);
+    box-shadow: 0 0 0 2px var(--ifpr-50);
+}
+
 .page-chat-gpt .chat-usage {
     margin: 0.5rem 0 0;
     font-size: 0.75rem;
