@@ -43,7 +43,7 @@ Sistema web em Django que permite a estudantes tirarem dúvidas com base em **do
 | IA | `google-genai` (Gemini), HTTP OpenRouter |
 | Documentos | `pypdf`, `python-docx` (extração de texto) |
 | Debug | Django Debug Toolbar (`DEBUG=True`) |
-| Deploy | Docker, Google Cloud Run — ver `DEPLOY_GCP.md` |
+| Deploy | Docker, Google Cloud Run e Google App Engine (`app.yaml`) — ver `DEPLOY_GCP.md` |
 
 ### 2.1 Variáveis de ambiente (`.env`)
 
@@ -430,26 +430,36 @@ make seed      # ou make reset-db
 ```
 chatifpr/
 ├── chatifpr/              # settings, urls raiz, wsgi
+├── ia/                    # assistente: RAG, chat, templates e templatetags
+│   ├── chat_service.py
+│   ├── rag_retrieval.py
+│   ├── embeddings.py
+│   ├── views.py
+│   ├── urls.py
+│   ├── templates/chat.html
+│   └── templatetags/
 ├── website/
 │   ├── models.py
 │   ├── views.py
 │   ├── urls.py
 │   ├── forms.py
+│   ├── filters.py
 │   ├── mixins.py
 │   ├── navigation.py
-│   ├── chat_service.py
-│   ├── usage.py
-│   ├── text_extraction.py
 │   ├── templatetags/
 │   ├── templates/website/
 │   ├── migrations/
 │   ├── management/commands/seed.py
 │   └── tests.py
+├── skills/            # assistente, RAG e deploy
 ├── static/            # CSS, imagens, diagramas
 ├── media/             # uploads locais
 ├── requirements.txt
+├── app.yaml
 ├── Makefile
 ├── Dockerfile
+├── AGENTS.md
+├── contexto_projeto.md
 ├── SPECS.md           # este documento
 ├── README.md
 └── DEPLOY_GCP.md

@@ -59,6 +59,8 @@ Projeto alinhado ao **Plano de Atividades de Programação Web 2026** (3 trimest
 
 ## Arquitetura e RAG Econômico
 
+O assistente mora no app `ia` (serviço de chat, RAG, embeddings, views e `ia/templates/chat.html`). O app `website` guarda o domínio, o CRUD e os filtros.
+
 ```
 Navegador → Django CBVs → IA 1 (Roteador JSON) → Recuperação Híbrida (Lexical + Vetorial / RRF)
                 ↓                                               ↓

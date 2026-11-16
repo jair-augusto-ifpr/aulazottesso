@@ -12,7 +12,7 @@ from django.urls import reverse
 
 from .document_processing import estimate_tokens
 from .embeddings import cosine_similarity, generate_single_embedding
-from .models import ChatBot, Conversation, MaterialChunk, ProfessorConfig, Student
+from website.models import ChatBot, Conversation, MaterialChunk, ProfessorConfig, Student
 
 
 _STOPWORD_SOURCES = (

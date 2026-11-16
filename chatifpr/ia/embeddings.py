@@ -7,7 +7,7 @@ import time
 from typing import List, Optional, Tuple
 
 from .document_processing import estimate_tokens
-from .models import ChatBot, Conversation, LLMCallLog, Professor, ProfessorConfig, Student
+from website.models import ChatBot, Conversation, LLMCallLog, Professor, ProfessorConfig, Student
 
 
 def cosine_similarity(vec_a: List[float], vec_b: List[float]) -> float:

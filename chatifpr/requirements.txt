@@ -11,3 +11,4 @@ django-storages[google]>=1.14.2
 google-auth>=2.26.0
 django-braces>=1.15.0
 django-debug-toolbar>=4.4.0
+django-filter>=24.3

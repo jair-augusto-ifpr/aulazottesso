@@ -7,7 +7,7 @@ from datetime import timedelta
 from django.db.models import Sum
 from django.utils import timezone
 
-from .models import LLMCallLog, Message, Professor, ProfessorConfig, Student
+from website.models import LLMCallLog, Message, Professor, ProfessorConfig, Student
 
 
 def get_config(professor: Professor) -> ProfessorConfig | None:

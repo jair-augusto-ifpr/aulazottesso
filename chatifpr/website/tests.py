@@ -6,8 +6,8 @@ from django.middleware.csrf import CsrfViewMiddleware
 from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 
-from .chat_format import citation_label, format_assistant_html
-from .chat_service import AnswerResult, RetrievedSnippet, retrieve_snippets
+from ia.chat_format import citation_label, format_assistant_html
+from ia.chat_service import AnswerResult, RetrievedSnippet, retrieve_snippets
 from .constants import GROUP_ALUNO, GROUP_PROFESSOR
 from .models import (
     ChatBot,
@@ -21,7 +21,7 @@ from .models import (
     ProfessorConfig,
     Student,
 )
-from .usage import can_send, consumed_tokens, remaining_tokens
+from ia.usage import can_send, consumed_tokens, remaining_tokens
 
 
 class GeminiOutputBudgetTests(SimpleTestCase):
@@ -31,7 +31,7 @@ class GeminiOutputBudgetTests(SimpleTestCase):
         from google.genai._common import convert_to_dict
         from google.genai.models import _GenerateContentParameters_to_mldev
 
-        from website.chat_service import (
+        from ia.chat_service import (
             _GENERATOR_MAX_OUTPUT_TOKENS,
             _gemini_generation_config,
         )
@@ -73,7 +73,7 @@ class GeminiOutputBudgetTests(SimpleTestCase):
 
 class GeminiOverloadFallbackTests(SimpleTestCase):
     def setUp(self):
-        from website.chat_service import _overloaded_until
+        from ia.chat_service import _overloaded_until
 
         _overloaded_until.clear()
 
@@ -91,10 +91,10 @@ class GeminiOverloadFallbackTests(SimpleTestCase):
             },
         )
 
-    @patch("website.chat_service.time.sleep")
+    @patch("ia.chat_service.time.sleep")
     @patch("google.genai.Client")
     def test_overloaded_model_retries_then_uses_fallback(self, client_cls, sleep):
-        from website.chat_service import _call_raw_gemini
+        from ia.chat_service import _call_raw_gemini
 
         ok = MagicMock()
         ok.text = "O próximo feriado é 2 de novembro."
@@ -131,12 +131,12 @@ class GeminiOverloadFallbackTests(SimpleTestCase):
         )
         sleep.assert_not_called()
 
-    @patch("website.chat_service.time.sleep")
+    @patch("ia.chat_service.time.sleep")
     @patch("google.genai.Client")
     def test_retired_model_switches_to_gemini_38(self, client_cls, sleep):
         from google.genai.errors import ClientError
 
-        from website.chat_service import _call_raw_gemini
+        from ia.chat_service import _call_raw_gemini
 
         retired = ClientError(
             404,
@@ -167,12 +167,12 @@ class GeminiOverloadFallbackTests(SimpleTestCase):
         self.assertEqual(models, ["gemini-2.0-flash", "gemini-3.8-flash"])
         sleep.assert_not_called()
 
-    @patch("website.chat_service.time.sleep")
+    @patch("ia.chat_service.time.sleep")
     @patch("google.genai.Client")
     def test_permanent_error_does_not_switch_model(self, client_cls, sleep):
         from google.genai.errors import ClientError
 
-        from website.chat_service import _call_raw_gemini
+        from ia.chat_service import _call_raw_gemini
 
         client_cls.return_value.models.generate_content.side_effect = ClientError(
             400,
@@ -188,10 +188,10 @@ class GeminiOverloadFallbackTests(SimpleTestCase):
         self.assertEqual(client_cls.return_value.models.generate_content.call_count, 1)
         sleep.assert_not_called()
 
-    @patch("website.chat_service.time.sleep")
+    @patch("ia.chat_service.time.sleep")
     @patch("google.genai.Client")
     def test_all_models_overloaded_returns_short_message(self, client_cls, _sleep):
-        from website.chat_service import _call_raw_gemini
+        from ia.chat_service import _call_raw_gemini
 
         client_cls.return_value.models.generate_content.side_effect = [
             self._server_error(),
@@ -354,7 +354,7 @@ class ChatFlowTests(TestCase):
         self.assertEqual(response.status_code, 403)
         self.assertIn("limite", response.json()["error"].lower())
 
-    @patch("website.views.build_answer")
+    @patch("ia.views.build_answer")
     def test_chat_send_returns_answer_and_persists_tokens(self, build_answer_mock):
         build_answer_mock.return_value = self._answer_result()
         self._login_student()
@@ -396,7 +396,7 @@ class ChatFlowTests(TestCase):
             ).exists()
         )
 
-    @patch("website.views.build_answer")
+    @patch("ia.views.build_answer")
     def test_chat_send_creates_conversation_when_missing(self, build_answer_mock):
         build_answer_mock.return_value = self._answer_result()
         self._login_student()
@@ -440,7 +440,7 @@ class MaterialExtractionTests(TestCase):
     def test_apply_extraction_replaces_short_manual_text(self):
         from unittest.mock import patch
 
-        from website.text_extraction import apply_material_text_extraction
+        from ia.text_extraction import apply_material_text_extraction
 
         prof_group, _ = Group.objects.get_or_create(name=GROUP_PROFESSOR)
         user = User.objects.create_user(username="ext01", password="testpass123")
@@ -457,7 +457,7 @@ class MaterialExtractionTests(TestCase):
 
         long_text = "Férias de julho de 13 a 31 de julho de 2026. " * 50
         with patch(
-            "website.text_extraction.extract_text_from_upload",
+            "ia.text_extraction.extract_text_from_upload",
             return_value=long_text,
         ):
             chars = apply_material_text_extraction(material, prefer_file=True)
@@ -685,8 +685,8 @@ class RAGImplementationTests(TestCase):
 
     # 1. Evidência situada depois dos primeiros 20 mil caracteres é recuperável
     def test_risk_1_evidence_after_20000_chars_is_retrieved(self):
-        from website.document_processing import index_material
-        from website.rag_retrieval import hybrid_retrieve
+        from ia.document_processing import index_material
+        from ia.rag_retrieval import hybrid_retrieve
 
         filler = "Texto institucional introdutório sem a resposta. " * 500  # ~25.000 caracteres
         secret_rule = "REGRA CRÍTICA: O prazo de rematrícula termina impreterivelmente às 23h59 de sexta-feira."
@@ -714,7 +714,7 @@ class RAGImplementationTests(TestCase):
 
     # 2. Limites dos chunks e do prompt incluem o envelope; overlap não duplica o contexto
     def test_risk_2_chunk_limits_and_prompt_budget(self):
-        from website.document_processing import chunk_text, estimate_tokens
+        from ia.document_processing import chunk_text, estimate_tokens
 
         sample_text = (
             "Parágrafo um com informações acadêmicas. " * 30
@@ -731,8 +731,8 @@ class RAGImplementationTests(TestCase):
 
     # 3. Regra, exceção, tabela e retificação permanecem interpretáveis
     def test_risk_3_tables_and_rectification_relations(self):
-        from website.document_processing import index_material
-        from website.rag_retrieval import hybrid_retrieve
+        from ia.document_processing import index_material
+        from ia.rag_retrieval import hybrid_retrieve
 
         orig = Material.objects.create(
             owner=self.professor,
@@ -779,7 +779,7 @@ class RAGImplementationTests(TestCase):
 
     # 5. Classificador não recebe documentos completos; JSON inválido leva a fallback seguro
     def test_risk_5_router_json_parsing_and_safe_fallback(self):
-        from website.chat_service import _parse_router_json
+        from ia.chat_service import _parse_router_json
 
         allowed = ["calendario", "atividades_complementares"]
         # JSON com wrapper markdown e categorias válidas
@@ -796,8 +796,8 @@ class RAGImplementationTests(TestCase):
 
     # 6. Pergunta sem evidência produz abstenção útil; delimitação contra injeção
     def test_risk_6_unanswerable_question_and_context_delimitation(self):
-        from website.chat_service import _format_evidences_context
-        from website.rag_retrieval import RetrievedEvidence
+        from ia.chat_service import _format_evidences_context
+        from ia.rag_retrieval import RetrievedEvidence
 
         # Contexto sem evidência
         empty_ctx = _format_evidences_context([])
@@ -820,7 +820,7 @@ class RAGImplementationTests(TestCase):
 
     # 7. Pergunta de continuação recebe referente correto sem vazar histórico alheio
     def test_risk_7_continuation_question_preserves_short_memory(self):
-        from website.chat_service import _format_conversation_history
+        from ia.chat_service import _format_conversation_history
 
         conv = Conversation.objects.create(student=self.student, chatbot=self.chatbot)
         Message.objects.create(
@@ -841,7 +841,7 @@ class RAGImplementationTests(TestCase):
 
     # 8. Reindexação é idempotente; invalidação e backfill transparente
     def test_risk_8_idempotent_indexing(self):
-        from website.document_processing import index_material
+        from ia.document_processing import index_material
 
         mat = Material.objects.create(
             owner=self.professor,
@@ -861,7 +861,7 @@ class RAGImplementationTests(TestCase):
 
     # 9. Provedores com usage ausente, timeouts e erros tratados com segurança
     def test_risk_9_provider_error_handling(self):
-        from website.chat_service import _call_provider
+        from ia.chat_service import _call_provider
 
         # Provedor inválido
         text, usage, err = _call_provider(
@@ -903,7 +903,7 @@ class RAGImplementationTests(TestCase):
         self.assertEqual(consumed_after, 200)
 
     # 11. Endpoint real retorna e persiste resposta e fontes enriquecidas
-    @patch("website.views.build_answer")
+    @patch("ia.views.build_answer")
     def test_risk_11_chat_send_returns_enriched_sources(self, mock_build):
         mock_build.return_value = AnswerResult(
             text="O prazo final é 30 de abril [F1].",
@@ -944,7 +944,7 @@ class RAGImplementationTests(TestCase):
         self.assertIn("download", source["download_url"])
 
     def test_router_model_is_cheap_only_when_main_model_is_expensive(self):
-        from website.chat_service import resolve_router_model
+        from ia.chat_service import resolve_router_model
 
         self.config.router_model = ""
         self.config.model = "gemini-2.5-pro"
@@ -962,8 +962,8 @@ class RAGImplementationTests(TestCase):
         self.assertEqual(resolve_router_model(self.config), "google/gemini-2.0-flash")
 
     def test_unrelated_question_returns_no_evidence(self):
-        from website.document_processing import index_material
-        from website.rag_retrieval import hybrid_retrieve
+        from ia.document_processing import index_material
+        from ia.rag_retrieval import hybrid_retrieve
 
         mat = Material.objects.create(
             owner=self.professor,
@@ -984,8 +984,8 @@ class RAGImplementationTests(TestCase):
         self.assertEqual(usage, {})
 
     def test_stopwords_and_substrings_do_not_retrieve_the_wrong_chunk(self):
-        from website.document_processing import index_material
-        from website.rag_retrieval import hybrid_retrieve
+        from ia.document_processing import index_material
+        from ia.rag_retrieval import hybrid_retrieve
 
         mat = Material.objects.create(
             owner=self.professor,
@@ -1007,8 +1007,8 @@ class RAGImplementationTests(TestCase):
         self.assertTrue(any("secretaria" in ev.content for ev in real_hit))
 
     def test_natural_question_matches_plural_in_the_calendar(self):
-        from website.document_processing import index_material
-        from website.rag_retrieval import hybrid_retrieve
+        from ia.document_processing import index_material
+        from ia.rag_retrieval import hybrid_retrieve
 
         mat = Material.objects.create(
             owner=self.professor,
@@ -1034,7 +1034,7 @@ class RAGImplementationTests(TestCase):
     def test_file_bytes_change_invalidates_index_hash(self):
         from django.core.files.uploadedfile import SimpleUploadedFile
 
-        from website.document_processing import index_material
+        from ia.document_processing import index_material
 
         mat = Material.objects.create(
             owner=self.professor,
@@ -1060,7 +1060,7 @@ class RAGImplementationTests(TestCase):
         self.assertNotEqual(mat.content_hash, first_hash)
 
     def test_embedding_audit_charges_only_the_student_on_the_question(self):
-        from website.embeddings import embedding_token_usage, generate_batch_embeddings
+        from ia.embeddings import embedding_token_usage, generate_batch_embeddings
 
         priced = embedding_token_usage(MagicMock(usage_metadata=None), ["prazo de rematrícula"])
         self.assertGreater(priced["total"], 0)
@@ -1099,7 +1099,7 @@ class RAGImplementationTests(TestCase):
         )
 
     def test_embedding_api_failure_is_logged(self):
-        from website.embeddings import generate_batch_embeddings
+        from ia.embeddings import generate_batch_embeddings
 
         with patch("google.genai.Client", side_effect=RuntimeError("sem rede")):
             vectors, _model, _dim, usage = generate_batch_embeddings(

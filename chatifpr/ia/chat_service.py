@@ -15,7 +15,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from .document_processing import estimate_tokens
-from .models import ChatBot, Conversation, LLMCallLog, Material, Message, ProfessorConfig
+from website.models import ChatBot, Conversation, LLMCallLog, Material, Message, ProfessorConfig
 from .rag_retrieval import RetrievedEvidence, hybrid_retrieve
 
 

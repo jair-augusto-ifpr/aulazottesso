@@ -2,9 +2,9 @@
 
 from django.core.management.base import BaseCommand
 
-from website.document_processing import index_material
+from ia.document_processing import index_material
 from website.models import Material, Professor
-from website.text_extraction import apply_material_text_extraction
+from ia.text_extraction import apply_material_text_extraction
 
 
 class Command(BaseCommand):

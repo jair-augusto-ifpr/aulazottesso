@@ -8,7 +8,7 @@ from typing import List, Tuple
 
 from django.db import transaction
 
-from .models import Material, MaterialChunk
+from website.models import Material, MaterialChunk
 from .text_extraction import ExtractedBlock, extract_document_blocks
 
 

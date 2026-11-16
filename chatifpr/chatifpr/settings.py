@@ -49,10 +49,10 @@ CSRF_TRUSTED_ORIGINS = [
     o.strip() for o in _csrf_origins.split(",") if o.strip()
 ]
 
-# Cloud Run encerra o TLS e encaminha a requisição em HTTP.
-# Sem isto, o Django compara o Origin https:// com http:// e responde 403
-# em qualquer POST (cadastro, login, admin).
-if os.environ.get("K_SERVICE"):
+# Cloud Run (K_SERVICE) e App Engine (GAE_APPLICATION) encerram o TLS
+# e encaminham a requisição em HTTP. Sem isto, o Django compara o Origin
+# https:// com http:// e responde 403 em qualquer POST.
+if os.environ.get("K_SERVICE") or os.environ.get("GAE_APPLICATION"):
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 
@@ -66,7 +66,9 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     # Apps
+    "django_filters",
     "website.apps.WebsiteConfig",
+    "ia.apps.IaConfig",
 ]
 
 MIDDLEWARE = [

@@ -230,7 +230,7 @@ class Command(BaseCommand):
             chatbot_prof.courses.set([informatica])
         chatbot_prof.materials.set([material_prof])
 
-        from website.document_processing import index_material
+        from ia.document_processing import index_material
 
         index_material(calendario, force=False, generate_embeddings=False)
         index_material(material_prof, force=False, generate_embeddings=False)

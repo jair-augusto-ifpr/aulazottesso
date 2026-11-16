@@ -19,7 +19,7 @@ from django.contrib.auth.models import Group, User
 from django.core.management.base import BaseCommand
 
 from website.constants import GROUP_ALUNO, GROUP_PROFESSOR
-from website.document_processing import estimate_tokens, index_material
+from ia.document_processing import estimate_tokens, index_material
 from website.models import (
     ChatBot,
     Conversation,
@@ -29,7 +29,7 @@ from website.models import (
     ProfessorConfig,
     Student,
 )
-from website.rag_retrieval import hybrid_retrieve
+from ia.rag_retrieval import hybrid_retrieve
 
 
 # Conjunto de perguntas de teste representativas do IFPR com evidências esperadas
@@ -277,7 +277,7 @@ class Command(BaseCommand):
 
             # --- ESTRATÉGIA A: Baseline Legado (até 8 x 20.000 caracteres) ---
             t0 = time.monotonic()
-            from website.chat_service import retrieve_snippets
+            from ia.chat_service import retrieve_snippets
 
             snippets_a = retrieve_snippets(chatbot, q, limit=8, include_private=True)
             t_a = (time.monotonic() - t0) * 1000

@@ -1,7 +1,7 @@
 from django import template
 from django.utils.safestring import mark_safe
 
-from website.chat_format import citation_label, format_assistant_html, parse_citation_id
+from ia.chat_format import citation_label, format_assistant_html, parse_citation_id
 
 register = template.Library()
 

@@ -46,6 +46,17 @@ gcloud run jobs execute chatifpr-admin --region southamerica-east1 --wait
 - [ ] Upload de PDF aparece no bucket GCS e persiste após restart
 - [ ] Chat encontra texto do material
 
+## App Engine
+
+O serviço também sobe no App Engine Standard (Python 3.12) a partir de `app.yaml`.
+
+```bash
+export GCP_PROJECT_ID=chatifpr
+./scripts/deploy-gae.sh
+```
+
+O script cria a aplicação na região `southamerica-east1` se ela ainda não existir, injeta `SECRET_KEY` e `DATABASE_URL` num YAML temporário e publica sem gravar segredo no repositório. A URL fica em `https://<projeto>.appspot.com`.
+
 ## Texto para relatório (TCC)
 
 > O protótipo foi implantado no Google Cloud utilizando o serviço Cloud Run para execução da aplicação Django em ambiente serverless, com banco de dados PostgreSQL gerenciado pelo Cloud SQL e armazenamento de documentos (uploads) no Google Cloud Storage. Essa arquitetura permite escalabilidade, implantação simplificada via container e redução da administração de servidores, mantendo persistência dos dados e dos arquivos institucionais.

@@ -4,5 +4,7 @@ __pycache__/
 db.sqlite3
 .env
 .gcp-deploy-secrets.local
+app.secrets.yaml
+app.deploy.yaml
 media/
 reports/
