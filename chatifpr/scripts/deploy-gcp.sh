@@ -75,6 +75,9 @@ else:
         "GEMINI_MODEL": os.environ.get("GEMINI_MODEL", "gemini-3.8-flash"),
         "OPENROUTER_API_KEY": os.environ.get("OPENROUTER_API_KEY", ""),
     }
+    csrf = os.environ.get("CSRF_TRUSTED_ORIGINS", "").strip()
+    if csrf:
+        vals["CSRF_TRUSTED_ORIGINS"] = csrf
 gs = os.environ.get("CHATIFPR_GS_BUCKET_NAME", "")
 if gs:
     vals["GS_BUCKET_NAME"] = gs
@@ -84,22 +87,32 @@ with open(path, "w", encoding="utf-8") as fh:
 PY
 }
 
+# Mantém a origem já publicada para o --env-vars-file não apagar o CSRF no meio do deploy.
+if [[ -z "${CSRF_TRUSTED_ORIGINS:-}" ]]; then
+  CSRF_TRUSTED_ORIGINS="$(gcloud run services describe "$SERVICE_NAME" \
+    --region="$REGION" \
+    --format='value(status.url)' 2>/dev/null || true)"
+  export CSRF_TRUSTED_ORIGINS
+fi
+
 write_env_file service
 
 echo "==> Deploy Cloud Run..."
-# 30 threads por instância, alinhado ao Gunicorn em entrypoint.sh.
-# A segunda instância só sobe se passar de 30 requisições ao mesmo tempo.
+# Uso esparso (uma pessoa por vez): escala a zero quando ninguém acessa.
+# CPU só é cobrada durante a requisição (--cpu-throttling).
+# cpu-boost encurta o cold start na primeira visita depois do sono.
 DEPLOY_COMMON=(
   "$SERVICE_NAME"
   --region="$REGION"
   --allow-unauthenticated
   --quiet
-  --concurrency=30
+  --concurrency=8
   --timeout=180
-  --cpu=2
-  --memory=2Gi
-  --min-instances=1
-  --max-instances=3
+  --cpu=1
+  --memory=1Gi
+  --min-instances=0
+  --max-instances=1
+  --cpu-throttling
   --cpu-boost
   --env-vars-file="$ENV_FILE"
 )

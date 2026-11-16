@@ -28,7 +28,7 @@ def get_embedding_config(
 ) -> Tuple[str, str, str]:
     """Retorna (provider, api_key, model) configurados para embedding.
 
-    Se embedding_model não estiver especificado, usa text-embedding-004 no Gemini.
+    Se embedding_model não estiver especificado, usa gemini-embedding-001 no Gemini.
     """
     conf = config or (getattr(professor, "config", None) if professor else None)
     if not conf or not conf.has_api():
@@ -39,7 +39,7 @@ def get_embedding_config(
     model = (conf.embedding_model or "").strip()
 
     if not model and provider == ProfessorConfig.PROVIDER_GEMINI:
-        model = "text-embedding-004"
+        model = "gemini-embedding-001"
 
     return provider, api_key, model
 

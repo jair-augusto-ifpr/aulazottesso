@@ -9,6 +9,9 @@
             <div class="card auth-card">
                 <div class="card-body p-4">
                     <h1 class="h4 fw-bold text-ifpr-900 mb-2">Área do professor</h1>
+                    {% if user.is_authenticated %}
+                        <p class="alert alert-warning">Você está conectado como <strong>{{ user.get_username }}</strong>. Entrar com um SIAPE substitui esta sessão.</p>
+                    {% endif %}
                     <p class="text-muted mb-4">Use seu <strong>SIAPE</strong> e a senha cadastrada para gerenciar documentos dos chatbots.</p>
                     <form method="post" novalidate>
                         {% csrf_token %}

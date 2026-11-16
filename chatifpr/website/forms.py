@@ -258,7 +258,7 @@ class MaterialForm(forms.ModelForm):
 class ChatBotForm(forms.ModelForm):
   class Meta:
     model = ChatBot
-    fields = ["prompt", "courses", "materials"]
+    fields = ["prompt", "is_global", "courses", "materials"]
     widgets = {
       "prompt": forms.Textarea(
         attrs={
@@ -267,9 +267,27 @@ class ChatBotForm(forms.ModelForm):
           "placeholder": "Instruções para o assistente responder aos estudantes.",
         }
       ),
+      "is_global": forms.CheckboxInput(attrs=CHECK_CLASS),
       "courses": forms.CheckboxSelectMultiple(attrs=CHECK_CLASS),
       "materials": forms.CheckboxSelectMultiple(attrs=CHECK_CLASS),
     }
+
+  def save(self, commit=True):
+    instance = super().save(commit=commit)
+    if not instance.is_global:
+      return instance
+    if commit:
+      instance.courses.clear()
+      return instance
+
+    save_m2m = self.save_m2m
+
+    def save_m2m_and_clear():
+      save_m2m()
+      instance.courses.clear()
+
+    self.save_m2m = save_m2m_and_clear
+    return instance
 
   def __init__(self, *args, professor=None, **kwargs):
     super().__init__(*args, **kwargs)
@@ -324,7 +342,7 @@ class ProfessorConfigForm(forms.ModelForm):
       "embedding_model": forms.TextInput(
         attrs={
           **INPUT_CLASS,
-          "placeholder": "Opcional. Ex.: text-embedding-004",
+          "placeholder": "Opcional. Ex.: gemini-embedding-001",
         }
       ),
       "rag_mode": forms.Select(attrs=SELECT_CLASS),

@@ -63,9 +63,9 @@ class MaterialAdmin(admin.ModelAdmin):
 
 @admin.register(ChatBot)
 class ChatBotAdmin(admin.ModelAdmin):
-    list_display = ("id", "owner", "created_at")
+    list_display = ("id", "owner", "is_global", "created_at")
     list_select_related = ("owner",)
-    list_filter = ("owner",)
+    list_filter = ("owner", "is_global")
     search_fields = ("prompt", "owner__name")
     filter_horizontal = ("materials", "courses")
     raw_id_fields = ("owner",)

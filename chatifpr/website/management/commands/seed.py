@@ -134,8 +134,8 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS("Superusuário admin / admin123 criado."))
 
         informatica, _ = Course.objects.get_or_create(name="Informática")
-        administracao, _ = Course.objects.get_or_create(name="Administração")
-        all_courses = [informatica, administracao]
+        Course.objects.filter(name="Administração").delete()
+        all_courses = [informatica]
 
         professor = self._ensure_professor(
             username="2074709",
@@ -212,8 +212,9 @@ class Command(BaseCommand):
                 ),
             },
         )
-        if created or not chatbot_secretaria.courses.exists():
-            chatbot_secretaria.courses.set(all_courses)
+        chatbot_secretaria.is_global = True
+        chatbot_secretaria.save(update_fields=["is_global"])
+        chatbot_secretaria.courses.clear()
         chatbot_secretaria.materials.set([calendario])
 
         chatbot_prof, created = ChatBot.objects.get_or_create(

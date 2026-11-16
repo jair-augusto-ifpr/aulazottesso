@@ -7,10 +7,30 @@
 <div class="container py-4 py-lg-5">
     <section class="mb-4">
         <h1 class="h3 fw-bold text-ifpr-900 mb-2">Olá, {{ student.name }}</h1>
-        <p class="text-muted mb-0">Escolha seu curso e converse com o assistente do professor sobre calendário, regulamentos e orientações.</p>
+        <p class="text-muted mb-0">Os assistentes institucionais atendem qualquer curso. Os demais ficam no curso em que você está matriculado.</p>
     </section>
 
-    {% if not rows %}
+    {% if global_chatbots %}
+        <section class="card mb-3">
+            <div class="card-body">
+                <h2 class="h5 course-block-title mb-3">Para todos os cursos</h2>
+                <ul class="list-unstyled d-flex flex-column gap-2 mb-0">
+                    {% for bot in global_chatbots %}
+                        <li class="chatbot-tile d-flex flex-wrap align-items-center justify-content-between gap-2 p-3">
+                            <div>
+                                <strong class="text-ifpr-900 d-block">{{ bot.assistant_title }}</strong>
+                            </div>
+                            <a class="btn btn-primary btn-sm" href="{% url 'student_chat' bot.pk %}{% nav_from_suffix %}">
+                                <i class="bi bi-chat-dots me-1"></i>Conversar
+                            </a>
+                        </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </section>
+    {% endif %}
+
+    {% if not rows and not global_chatbots %}
         <div class="card">
             <div class="card-body">
                 <p class="text-muted mb-0">Você ainda não está vinculado a nenhum curso. Peça ao responsável para associar seu cadastro no admin.</p>

@@ -34,7 +34,13 @@
                         <tr>
                             <td>{{ b.assistant_title }}</td>
                             <td><span class="badge text-bg-light border">{{ b.material_count }}</span></td>
-                            <td>{% for c in b.courses.all %}{{ c.name }}{% if not forloop.last %}, {% endif %}{% endfor %}</td>
+                            <td>
+                                {% if b.is_global %}
+                                    Global
+                                {% else %}
+                                    {% for c in b.courses.all %}{{ c.name }}{% if not forloop.last %}, {% endif %}{% endfor %}
+                                {% endif %}
+                            </td>
                             {% include "website/includes/table_actions_dropdown.html" with row_id=b.pk view_url=view_url edit_url=edit_url delete_url=delete_url %}
                         </tr>
                         {% empty %}

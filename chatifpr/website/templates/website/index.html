@@ -77,7 +77,9 @@
                     <li class="list-group-item px-0">
                         <strong>{{ bot.assistant_title }}</strong>
                         <span class="text-muted"> — professor {{ bot.owner.name }}</span>
-                        {% if bot.courses.all %}
+                        {% if bot.is_global %}
+                            <span class="text-muted"> · Global</span>
+                        {% elif bot.courses.all %}
                             <span class="text-muted"> · {% for c in bot.courses.all %}{{ c.name }}{% if not forloop.last %}, {% endif %}{% endfor %}</span>
                         {% endif %}
                     </li>

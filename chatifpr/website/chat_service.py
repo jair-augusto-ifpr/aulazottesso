@@ -188,43 +188,211 @@ def _openrouter_usage(data: dict) -> dict:
     return {"prompt": prompt, "completion": completion, "total": total, "cached": cached}
 
 
+# No Gemini 3 o raciocínio interno conta no mesmo teto da resposta visível.
+# 8192 ainda cortava frases no meio quando o pensamento consumia a folga.
+# 32768 cabe no teto de 65536 do gemini-3.8-flash.
+_GENERATOR_MAX_OUTPUT_TOKENS = 32768
+# O roteador devolve só o JSON da classificação. 512 ficava curto porque
+# o pensamento mínimo divide esse teto com o objeto.
+_ROUTER_MAX_OUTPUT_TOKENS = 2048
+_GEMINI_TRANSIENT_CODES = {408, 429, 500, 502, 503, 504}
+_GEMINI_OVERLOAD_FALLBACKS = (
+    "gemini-3.8-flash",
+    "gemini-3.5-flash-lite",
+)
+_GEMINI_REQUEST_TIMEOUT_MS = 20000
+_OVERLOAD_COOLDOWN_SECONDS = 120
+_overloaded_until: dict[str, float] = {}
+
+
+def _gemini_is_overloaded(exc: Exception) -> bool:
+    code = getattr(exc, "code", None)
+    try:
+        code = int(code)
+    except (TypeError, ValueError):
+        code = None
+    if code in _GEMINI_TRANSIENT_CODES:
+        return True
+    text = str(exc).lower()
+    return any(
+        marker in text
+        for marker in ("unavailable", "high demand", "resource exhausted", "overloaded")
+    )
+
+
+def _gemini_model_retired(exc: Exception) -> bool:
+    code = getattr(exc, "code", None)
+    try:
+        code = int(code)
+    except (TypeError, ValueError):
+        code = None
+    text = str(exc).lower()
+    return code == 404 or "no longer available" in text
+
+
+def _thinking_level(model: str, thinking: str) -> str:
+    """O gemini-3.8-flash rejeita MINIMAL. Nesse modelo, o menor nível é LOW."""
+    name = (model or "").lower()
+    if thinking == "minimal" and "3.8" not in name:
+        return "MINIMAL"
+    return "LOW"
+
+
+def _mark_overloaded(model: str) -> None:
+    _overloaded_until[model] = time.monotonic() + _OVERLOAD_COOLDOWN_SECONDS
+
+
+def _model_is_cooling_down(model: str) -> bool:
+    until = _overloaded_until.get(model)
+    if until is None:
+        return False
+    if time.monotonic() >= until:
+        _overloaded_until.pop(model, None)
+        return False
+    return True
+
+
+def _gemini_candidates(model: str) -> list[str]:
+    ordered = []
+    for name in (model, *_GEMINI_OVERLOAD_FALLBACKS):
+        if name in ordered or _model_is_cooling_down(name):
+            continue
+        ordered.append(name)
+    if not ordered:
+        ordered.append(model)
+    return ordered
+
+
+def _gemini_failure_message(exc: Exception) -> str:
+    if _gemini_is_overloaded(exc):
+        return (
+            "O Gemini está com alta demanda neste momento. "
+            "Tente novamente em alguns instantes."
+        )
+    return f"Falha ao chamar Gemini: {exc}"
+
+
+def _used_model(usage: dict, default: str) -> str:
+    name = (usage or {}).get("model")
+    if isinstance(name, str) and name.strip():
+        return name.strip()
+    return default
+
+
+def _gemini_generation_config(
+    system_instruction: str,
+    temperature: float,
+    max_output_tokens: int,
+    model: str,
+    *,
+    thinking: str,
+):
+    """Monta a config do Gemini.
+
+    No Gemini 3 o pensamento vem ligado em nível alto e consome o teto de
+    saída. O SDK instalado ainda não declara ``thinking_level``, então o
+    campo segue como dict para chegar na API como ``thinkingLevel``.
+    """
+    from google.genai import types
+
+    name = (model or "").lower()
+    kwargs = {
+        "system_instruction": system_instruction,
+        "temperature": temperature,
+        "max_output_tokens": max_output_tokens,
+    }
+    if "gemini-3" in name:
+        kwargs["thinking_config"] = {"thinkingLevel": _thinking_level(name, thinking)}
+        return types.GenerateContentConfig.model_construct(**kwargs)
+    if "gemini-2.5" in name:
+        budget = 0 if thinking == "minimal" else 1024
+        kwargs["thinking_config"] = {"thinkingBudget": budget}
+        return types.GenerateContentConfig.model_construct(**kwargs)
+    return types.GenerateContentConfig(**kwargs)
+
+
+def _generate_gemini_once(
+    client,
+    system_instruction: str,
+    user_prompt: str,
+    model: str,
+    max_output_tokens: int,
+    temperature: float,
+    thinking: str,
+) -> Tuple[Optional[str], dict, Optional[Exception]]:
+    response = client.models.generate_content(
+        model=model,
+        contents=user_prompt,
+        config=_gemini_generation_config(
+            system_instruction,
+            temperature,
+            max_output_tokens,
+            model,
+            thinking=thinking,
+        ),
+    )
+    text = (getattr(response, "text", None) or "").strip()
+    usage = _gemini_usage(response)
+    if not text:
+        feedback = getattr(response, "prompt_feedback", None)
+        reason = getattr(feedback, "block_reason", None) if feedback else None
+        suffix = f" ({reason})" if reason else ""
+        return None, usage, RuntimeError(f"Gemini retornou resposta vazia{suffix}.")
+    usage = dict(usage)
+    usage["model"] = model
+    return text, usage, None
+
+
 def _call_raw_gemini(
     system_instruction: str,
     user_prompt: str,
     api_key: str,
     model: str,
-    max_output_tokens: int = 700,
+    max_output_tokens: int = _GENERATOR_MAX_OUTPUT_TOKENS,
     temperature: float = 0.2,
+    thinking: str = "low",
 ) -> Tuple[Optional[str], dict, Optional[str]]:
     key = (api_key or "").strip()
     model = (model or "").strip() or "gemini-3.8-flash"
     if not key:
         return None, {}, "Chave Gemini não configurada."
 
+    candidates = _gemini_candidates(model)
+
     try:
         from google import genai
         from google.genai import types
 
-        client = genai.Client(api_key=key)
-        response = client.models.generate_content(
-            model=model,
-            contents=user_prompt,
-            config=types.GenerateContentConfig(
-                system_instruction=system_instruction,
-                temperature=temperature,
-                max_output_tokens=max_output_tokens,
-            ),
+        client = genai.Client(
+            api_key=key,
+            http_options=types.HttpOptions(timeout=_GEMINI_REQUEST_TIMEOUT_MS),
         )
-        text = (getattr(response, "text", None) or "").strip()
-        usage = _gemini_usage(response)
-        if not text:
-            feedback = getattr(response, "prompt_feedback", None)
-            reason = getattr(feedback, "block_reason", None) if feedback else None
-            suffix = f" ({reason})" if reason else ""
-            return None, usage, f"Gemini retornou resposta vazia{suffix}."
-        return text, usage, None
     except Exception as exc:
         return None, {}, f"Falha ao chamar Gemini: {exc}"
+
+    last_error: Optional[Exception] = None
+    for candidate in candidates:
+        try:
+            text, usage, empty = _generate_gemini_once(
+                client,
+                system_instruction,
+                user_prompt,
+                candidate,
+                max_output_tokens,
+                temperature,
+                thinking,
+            )
+        except Exception as exc:
+            last_error = exc
+            if _gemini_model_retired(exc) or _gemini_is_overloaded(exc):
+                if _gemini_is_overloaded(exc):
+                    _mark_overloaded(candidate)
+                continue
+            return None, {}, _gemini_failure_message(exc)
+        if empty is not None:
+            return None, usage, str(empty)
+        return text, usage, None
+    return None, {}, _gemini_failure_message(last_error or RuntimeError("falha desconhecida"))
 
 
 def _call_raw_openrouter(
@@ -285,12 +453,19 @@ def _call_provider(
     user_prompt: str,
     api_key: str,
     model: str,
-    max_output_tokens: int = 700,
+    max_output_tokens: int = _GENERATOR_MAX_OUTPUT_TOKENS,
     temperature: float = 0.2,
+    thinking: str = "low",
 ) -> Tuple[Optional[str], dict, Optional[str]]:
     if provider == ProfessorConfig.PROVIDER_GEMINI:
         return _call_raw_gemini(
-            system_instruction, user_prompt, api_key, model, max_output_tokens, temperature
+            system_instruction,
+            user_prompt,
+            api_key,
+            model,
+            max_output_tokens,
+            temperature,
+            thinking,
         )
     elif provider == ProfessorConfig.PROVIDER_OPENROUTER:
         return _call_raw_openrouter(
@@ -476,16 +651,18 @@ def run_router(
         user_prompt=user_prompt,
         api_key=config.api_key,
         model=model_name,
-        max_output_tokens=256,
+        max_output_tokens=_ROUTER_MAX_OUTPUT_TOKENS,
         temperature=0.0,
+        thinking="minimal",
     )
     duration_ms = int((time.monotonic() - start_time) * 1000)
+    used_model = _used_model(usage, model_name)
 
     status = LLMCallLog.STATUS_SUCCESS if not err and text else LLMCallLog.STATUS_FALLBACK
     _log_call(
         stage=LLMCallLog.STAGE_ROUTER,
         provider=config.provider,
-        model_name=model_name,
+        model_name=used_model,
         status=status,
         duration_ms=duration_ms,
         usage=usage,
@@ -619,15 +796,17 @@ def build_answer(
             user_prompt=user_prompt,
             api_key=config.api_key,
             model=config.model,
-            max_output_tokens=700,
+            max_output_tokens=_GENERATOR_MAX_OUTPUT_TOKENS,
+            thinking="low",
         )
         duration_ms = int((time.monotonic() - start_time) * 1000)
+        used_model = _used_model(gen_usage, config.model)
 
         status = LLMCallLog.STATUS_SUCCESS if not err else LLMCallLog.STATUS_FAILED
         _log_call(
             stage=LLMCallLog.STAGE_GENERATOR,
             provider=config.provider,
-            model_name=config.model,
+            model_name=used_model,
             status=status,
             duration_ms=duration_ms,
             usage=gen_usage,
@@ -642,7 +821,7 @@ def build_answer(
                 text="",
                 snippets=snippets,
                 provider=config.provider,
-                model=config.model,
+                model=used_model,
                 error=err,
             )
 
@@ -650,7 +829,7 @@ def build_answer(
             text=text or "",
             snippets=snippets,
             provider=config.provider,
-            model=config.model,
+            model=used_model,
             tokens_prompt=gen_usage.get("prompt", 0),
             tokens_completion=gen_usage.get("completion", 0),
             tokens_total=gen_usage.get("total", 0),
@@ -740,16 +919,18 @@ def build_answer(
         user_prompt=generator_user_prompt,
         api_key=config.api_key,
         model=config.model,
-        max_output_tokens=700,
+        max_output_tokens=_GENERATOR_MAX_OUTPUT_TOKENS,
         temperature=0.2,
+        thinking="low",
     )
     duration_ms = int((time.monotonic() - start_time) * 1000)
+    used_model = _used_model(gen_usage, config.model)
 
     status = LLMCallLog.STATUS_SUCCESS if not err else LLMCallLog.STATUS_FAILED
     _log_call(
         stage=LLMCallLog.STAGE_GENERATOR,
         provider=config.provider,
-        model_name=config.model,
+        model_name=used_model,
         status=status,
         duration_ms=duration_ms,
         usage=gen_usage,
@@ -764,7 +945,7 @@ def build_answer(
             text="",
             snippets=snippets,
             provider=config.provider,
-            model=config.model,
+            model=used_model,
             tokens_prompt=(router_usage.get("prompt", 0) or 0) + (embed_usage.get("prompt", 0) or 0),
             tokens_completion=(router_usage.get("completion", 0) or 0) + (embed_usage.get("completion", 0) or 0),
             tokens_total=(router_usage.get("total", 0) or 0) + (embed_usage.get("total", 0) or 0),
@@ -801,7 +982,7 @@ def build_answer(
         text=gen_text or "",
         snippets=snippets,
         provider=config.provider,
-        model=config.model,
+        model=used_model,
         tokens_prompt=tot_prompt,
         tokens_completion=tot_completion,
         tokens_total=tot_total,

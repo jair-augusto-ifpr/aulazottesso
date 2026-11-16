@@ -1,16 +1,32 @@
 from braces.views import GroupRequiredMixin
+from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, redirect
 
 from .constants import GROUP_ALUNO, GROUP_PROFESSOR
 from .models import Professor, Student
 from .navigation import get_nav_from_param, resolve_back_navigation
 
 
+def user_has_profile(user, related_name: str) -> bool:
+    """OneToOne reverso ausente levanta DoesNotExist; hasattr devolve False."""
+    return hasattr(user, related_name)
+
+
 class ProfessorRequiredMixin(LoginRequiredMixin, GroupRequiredMixin):
     group_required = GROUP_PROFESSOR
     login_url = "professor_login"
     raise_exception = True
+
+    def dispatch(self, request, *args, **kwargs):
+        user = request.user
+        if user.is_authenticated and not user_has_profile(user, "professor_profile"):
+            messages.info(
+                request,
+                "Esta conta não tem perfil de professor. Entre com o SIAPE para abrir o painel.",
+            )
+            return redirect(self.login_url)
+        return super().dispatch(request, *args, **kwargs)
 
     def get_professor(self) -> Professor:
         cached = getattr(self, "_professor", None)
@@ -27,6 +43,16 @@ class StudentRequiredMixin(LoginRequiredMixin, GroupRequiredMixin):
     group_required = GROUP_ALUNO
     login_url = "student_login"
     raise_exception = True
+
+    def dispatch(self, request, *args, **kwargs):
+        user = request.user
+        if user.is_authenticated and not user_has_profile(user, "student_profile"):
+            messages.info(
+                request,
+                "Esta conta não tem perfil de estudante. Entre com o RA para abrir o painel.",
+            )
+            return redirect(self.login_url)
+        return super().dispatch(request, *args, **kwargs)
 
     def get_student(self) -> Student:
         cached = getattr(self, "_student", None)

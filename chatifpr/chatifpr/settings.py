@@ -49,6 +49,12 @@ CSRF_TRUSTED_ORIGINS = [
     o.strip() for o in _csrf_origins.split(",") if o.strip()
 ]
 
+# Cloud Run encerra o TLS e encaminha a requisição em HTTP.
+# Sem isto, o Django compara o Origin https:// com http:// e responde 403
+# em qualquer POST (cadastro, login, admin).
+if os.environ.get("K_SERVICE"):
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
 
 # Application definition
 

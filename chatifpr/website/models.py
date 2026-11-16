@@ -95,7 +95,7 @@ class ProfessorConfig(models.Model):
         "modelo de embedding",
         max_length=120,
         blank=True,
-        help_text="Opcional. Ex.: text-embedding-004.",
+        help_text="Opcional. Ex.: gemini-embedding-001.",
     )
     rag_mode = models.CharField(
         "modo RAG",
@@ -311,6 +311,11 @@ class ChatBot(models.Model):
         related_name="chatbots",
         verbose_name="cursos",
         blank=True,
+    )
+    is_global = models.BooleanField(
+        "global",
+        default=False,
+        help_text="Disponível para todos os estudantes, independente do curso.",
     )
     created_at = models.DateTimeField("criado em", auto_now_add=True)
 

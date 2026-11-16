@@ -1,7 +1,7 @@
 runtime: python312 
 
 entrypoint: gunicorn -b :$PORT --workers 1 --threads 30 --timeout 0 chatifpr.wsgi
-instance_class: F4_1G
+instance_class: F2
 
 
 handlers:
@@ -17,8 +17,8 @@ handlers:
 
 automatic_scaling:
 
-  min_instances: 1
+  min_instances: 0
 
-  max_instances: 3
+  max_instances: 1
 
-  max_concurrent_requests: 30
+  max_concurrent_requests: 8

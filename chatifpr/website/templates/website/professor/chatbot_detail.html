@@ -16,7 +16,7 @@
 
             <dl class="row mt-3 mb-3">
                 <dt class="col-sm-3">Cursos</dt>
-                <dd class="col-sm-9">{% for c in chatbot.courses.all %}{{ c.name }}{% if not forloop.last %}, {% endif %}{% empty %}—{% endfor %}</dd>
+                <dd class="col-sm-9">{% if chatbot.is_global %}Global — todos os estudantes{% else %}{% for c in chatbot.courses.all %}{{ c.name }}{% if not forloop.last %}, {% endif %}{% empty %}—{% endfor %}{% endif %}</dd>
                 <dt class="col-sm-3">Materiais vinculados</dt>
                 <dd class="col-sm-9">{{ chatbot.material_count }}</dd>
             </dl>

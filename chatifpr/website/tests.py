@@ -2,7 +2,8 @@ import json
 from unittest.mock import MagicMock, patch
 
 from django.contrib.auth.models import Group, User
-from django.test import TestCase
+from django.middleware.csrf import CsrfViewMiddleware
+from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 
 from .chat_format import citation_label, format_assistant_html
@@ -21,6 +22,190 @@ from .models import (
     Student,
 )
 from .usage import can_send, consumed_tokens, remaining_tokens
+
+
+class GeminiOutputBudgetTests(SimpleTestCase):
+    def test_gemini3_reserves_output_budget_for_the_visible_answer(self):
+        from google import genai
+        from google.genai import types
+        from google.genai._common import convert_to_dict
+        from google.genai.models import _GenerateContentParameters_to_mldev
+
+        from website.chat_service import (
+            _GENERATOR_MAX_OUTPUT_TOKENS,
+            _gemini_generation_config,
+        )
+
+        def generation_config(model, thinking, max_tokens):
+            cfg = _gemini_generation_config(
+                "sys", 0.2, max_tokens, model, thinking=thinking
+            )
+            params = types._GenerateContentParameters(
+                model=model, contents="oi", config=cfg
+            )
+            client = genai.Client(api_key="test")
+            body = convert_to_dict(
+                _GenerateContentParameters_to_mldev(client._api_client, params)
+            )
+            return body["generationConfig"]
+
+        answer = generation_config(
+            "gemini-3.7-flash", "low", _GENERATOR_MAX_OUTPUT_TOKENS
+        )
+        self.assertEqual(answer["maxOutputTokens"], 32768)
+        self.assertEqual(answer["thinkingConfig"]["thinkingLevel"], "LOW")
+
+        router = generation_config("gemini-3.8-flash", "minimal", 512)
+        self.assertEqual(router["thinkingConfig"]["thinkingLevel"], "LOW")
+
+        lite = generation_config("gemini-3.5-flash-lite", "minimal", 512)
+        self.assertEqual(lite["thinkingConfig"]["thinkingLevel"], "MINIMAL")
+
+        flash_25 = generation_config("gemini-2.5-flash", "minimal", 512)
+        self.assertEqual(flash_25["thinkingConfig"]["thinkingBudget"], 0)
+
+        flash_38 = generation_config(
+            "gemini-3.8-flash", "low", _GENERATOR_MAX_OUTPUT_TOKENS
+        )
+        self.assertEqual(flash_38["maxOutputTokens"], 32768)
+        self.assertEqual(flash_38["thinkingConfig"]["thinkingLevel"], "LOW")
+
+
+class GeminiOverloadFallbackTests(SimpleTestCase):
+    def setUp(self):
+        from website.chat_service import _overloaded_until
+
+        _overloaded_until.clear()
+
+    def _server_error(self):
+        from google.genai.errors import ServerError
+
+        return ServerError(
+            503,
+            {
+                "error": {
+                    "code": 503,
+                    "message": "This model is currently experiencing high demand.",
+                    "status": "UNAVAILABLE",
+                }
+            },
+        )
+
+    @patch("website.chat_service.time.sleep")
+    @patch("google.genai.Client")
+    def test_overloaded_model_retries_then_uses_fallback(self, client_cls, sleep):
+        from website.chat_service import _call_raw_gemini
+
+        ok = MagicMock()
+        ok.text = "O próximo feriado é 2 de novembro."
+        ok.usage_metadata = None
+        again = MagicMock()
+        again.text = "Resposta seguinte."
+        again.usage_metadata = None
+        client_cls.return_value.models.generate_content.side_effect = [
+            self._server_error(),
+            ok,
+            again,
+        ]
+
+        text, usage, err = _call_raw_gemini(
+            "sys", "quando é o feriado?", "test-key", "gemini-2.5-flash"
+        )
+
+        self.assertIsNone(err)
+        self.assertIn("2 de novembro", text)
+        self.assertEqual(usage["model"], "gemini-3.8-flash")
+
+        text, usage, err = _call_raw_gemini(
+            "sys", "de novo", "test-key", "gemini-2.5-flash"
+        )
+        self.assertIsNone(err)
+        self.assertEqual(usage["model"], "gemini-3.8-flash")
+        models = [
+            call.kwargs["model"]
+            for call in client_cls.return_value.models.generate_content.call_args_list
+        ]
+        self.assertEqual(
+            models,
+            ["gemini-2.5-flash", "gemini-3.8-flash", "gemini-3.8-flash"],
+        )
+        sleep.assert_not_called()
+
+    @patch("website.chat_service.time.sleep")
+    @patch("google.genai.Client")
+    def test_retired_model_switches_to_gemini_38(self, client_cls, sleep):
+        from google.genai.errors import ClientError
+
+        from website.chat_service import _call_raw_gemini
+
+        retired = ClientError(
+            404,
+            {
+                "error": {
+                    "code": 404,
+                    "message": "This model models/gemini-2.0-flash is no longer available.",
+                    "status": "NOT_FOUND",
+                }
+            },
+        )
+        ok = MagicMock()
+        ok.text = "Resposta do modelo atual."
+        ok.usage_metadata = None
+        client_cls.return_value.models.generate_content.side_effect = [retired, ok]
+
+        text, usage, err = _call_raw_gemini(
+            "sys", "oi", "test-key", "gemini-2.0-flash"
+        )
+
+        self.assertIsNone(err)
+        self.assertEqual(text, "Resposta do modelo atual.")
+        self.assertEqual(usage["model"], "gemini-3.8-flash")
+        models = [
+            call.kwargs["model"]
+            for call in client_cls.return_value.models.generate_content.call_args_list
+        ]
+        self.assertEqual(models, ["gemini-2.0-flash", "gemini-3.8-flash"])
+        sleep.assert_not_called()
+
+    @patch("website.chat_service.time.sleep")
+    @patch("google.genai.Client")
+    def test_permanent_error_does_not_switch_model(self, client_cls, sleep):
+        from google.genai.errors import ClientError
+
+        from website.chat_service import _call_raw_gemini
+
+        client_cls.return_value.models.generate_content.side_effect = ClientError(
+            400,
+            {"error": {"code": 400, "message": "API key not valid", "status": "INVALID_ARGUMENT"}},
+        )
+
+        text, _usage, err = _call_raw_gemini(
+            "sys", "oi", "test-key", "gemini-2.5-flash"
+        )
+
+        self.assertIsNone(text)
+        self.assertIn("Falha ao chamar Gemini", err)
+        self.assertEqual(client_cls.return_value.models.generate_content.call_count, 1)
+        sleep.assert_not_called()
+
+    @patch("website.chat_service.time.sleep")
+    @patch("google.genai.Client")
+    def test_all_models_overloaded_returns_short_message(self, client_cls, _sleep):
+        from website.chat_service import _call_raw_gemini
+
+        client_cls.return_value.models.generate_content.side_effect = [
+            self._server_error(),
+            self._server_error(),
+            self._server_error(),
+        ]
+
+        text, _usage, err = _call_raw_gemini(
+            "sys", "oi", "test-key", "gemini-2.5-flash"
+        )
+
+        self.assertIsNone(text)
+        self.assertIn("alta demanda", err)
+        self.assertNotIn("UNAVAILABLE", err)
 
 
 class ChatFlowTests(TestCase):
@@ -1111,4 +1296,33 @@ class ChatFormatTests(TestCase):
 
     def test_newlines_become_breaks(self):
         self.assertEqual(format_assistant_html("a\nb"), "a<br>b")
+
+
+class CloudRunCsrfTests(SimpleTestCase):
+    def _request(self):
+        host = "chatifpr-django-664553333725.southamerica-east1.run.app"
+        return RequestFactory().post(
+            "/estudante/cadastrar/",
+            HTTP_HOST=host,
+            HTTP_ORIGIN=f"https://{host}",
+            HTTP_X_FORWARDED_PROTO="https",
+        )
+
+    @override_settings(
+        SECURE_PROXY_SSL_HEADER=("HTTP_X_FORWARDED_PROTO", "https"),
+        ALLOWED_HOSTS=["chatifpr-django-664553333725.southamerica-east1.run.app"],
+        CSRF_TRUSTED_ORIGINS=[],
+    )
+    def test_https_origin_matches_when_proxy_tls_is_trusted(self):
+        request = self._request()
+        self.assertTrue(CsrfViewMiddleware(lambda r: None)._origin_verified(request))
+
+    @override_settings(
+        SECURE_PROXY_SSL_HEADER=None,
+        ALLOWED_HOSTS=["chatifpr-django-664553333725.southamerica-east1.run.app"],
+        CSRF_TRUSTED_ORIGINS=[],
+    )
+    def test_https_origin_is_rejected_when_cloud_run_forwards_http(self):
+        request = self._request()
+        self.assertFalse(CsrfViewMiddleware(lambda r: None)._origin_verified(request))
 

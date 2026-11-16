@@ -140,6 +140,8 @@ def _answer_and_store(chatbot, conversation, text, request_id=""):
 
 
 def _student_can_use_chatbot(student: Student, chatbot: ChatBot) -> bool:
+    if chatbot.is_global:
+        return True
     sc = {c.pk for c in student.courses.all()}
     bc = {c.pk for c in chatbot.courses.all()}
     return bool(sc & bc)
@@ -187,6 +189,12 @@ class StudentLoginView(LoginView):
     authentication_form = StudentLoginForm
     redirect_authenticated_user = True
 
+    def dispatch(self, request, *args, **kwargs):
+        user = request.user
+        if user.is_authenticated and not hasattr(user, "student_profile"):
+            self.redirect_authenticated_user = False
+        return super().dispatch(request, *args, **kwargs)
+
     def get_success_url(self):
         return reverse_lazy("student_dashboard")
 
@@ -195,6 +203,12 @@ class ProfessorLoginView(LoginView):
     template_name = "website/professor/login.html"
     authentication_form = ProfessorLoginForm
     redirect_authenticated_user = True
+
+    def dispatch(self, request, *args, **kwargs):
+        user = request.user
+        if user.is_authenticated and not hasattr(user, "professor_profile"):
+            self.redirect_authenticated_user = False
+        return super().dispatch(request, *args, **kwargs)
 
     def get_success_url(self):
         return reverse_lazy("professor_dashboard")
@@ -245,7 +259,7 @@ class StudentSignupView(CreateView):
     form_class = StudentSignupForm
 
     def dispatch(self, request, *args, **kwargs):
-        if request.user.is_authenticated:
+        if request.user.is_authenticated and hasattr(request.user, "student_profile"):
             return redirect("student_dashboard")
         return super().dispatch(request, *args, **kwargs)
 
@@ -278,7 +292,7 @@ class ProfessorSignupView(CreateView):
     form_class = ProfessorSignupForm
 
     def dispatch(self, request, *args, **kwargs):
-        if request.user.is_authenticated:
+        if request.user.is_authenticated and hasattr(request.user, "professor_profile"):
             return redirect("professor_dashboard")
         return super().dispatch(request, *args, **kwargs)
 
@@ -319,10 +333,15 @@ class StudentDashboardView(StudentRequiredMixin, TemplateView):
         courses = student.courses.prefetch_related(
             Prefetch(
                 "chatbots",
-                queryset=ChatBot.objects.select_related("owner"),
+                queryset=ChatBot.objects.filter(is_global=False).select_related(
+                    "owner"
+                ),
             )
         )
         ctx["student"] = student
+        ctx["global_chatbots"] = ChatBot.objects.filter(is_global=True).select_related(
+            "owner"
+        )
         ctx["rows"] = [
             {"course": course, "chatbots": course.chatbots.all()}
             for course in courses
@@ -563,12 +582,19 @@ class StudentMaterialDownloadView(StudentRequiredMixin, View):
         student_courses = set(student.courses.values_list("pk", flat=True))
         material_courses = set(material.courses.values_list("pk", flat=True))
         chatbot_courses = set(
-            Course.objects.filter(chatbots__materials=material).values_list(
-                "pk", flat=True
-            )
+            Course.objects.filter(
+                chatbots__materials=material,
+                chatbots__is_global=False,
+            ).values_list("pk", flat=True)
         )
+        used_by_global_chatbot = ChatBot.objects.filter(
+            is_global=True,
+            materials=material,
+        ).exists()
 
-        has_access = bool(student_courses & (material_courses | chatbot_courses))
+        has_access = used_by_global_chatbot or bool(
+            student_courses & (material_courses | chatbot_courses)
+        )
         if not has_access:
             raise PermissionDenied("Você não tem permissão para acessar este material.")
 
@@ -651,7 +677,9 @@ class CourseDetailView(NavBackMixin, ProfessorRequiredMixin, DetailView):
         ctx = super().get_context_data(**kwargs)
         course = self.object
         ctx["materials"] = course.materials.select_related("owner")[:10]
-        ctx["chatbots"] = course.chatbots.select_related("owner")[:10]
+        ctx["chatbots"] = course.chatbots.filter(is_global=False).select_related(
+            "owner"
+        )[:10]
         return ctx
 
 
